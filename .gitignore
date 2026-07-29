@@ -1,0 +1,16 @@
+build/**
+build-*/**
+target/**
+**/compile_commands.json
+
+.idea/**
+
+CMakeUserPresets.json
+
+.cache/**
+
+.vs/**
+
+**/*.log
+
+**/vcpkg_installed

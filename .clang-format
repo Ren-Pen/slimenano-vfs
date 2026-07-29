@@ -1,0 +1,40 @@
+﻿---
+BasedOnStyle: LLVM
+AccessModifierOffset: -4
+AlignAfterOpenBracket: BlockIndent
+AlignArrayOfStructures: Right
+AllowShortBlocksOnASingleLine: Empty
+AllowShortCaseExpressionOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortCompoundRequirementOnASingleLine: true
+AllowShortEnumsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: InlineOnly
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLambdasOnASingleLine: Empty
+AllowShortLoopsOnASingleLine: false
+BinPackArguments: false
+BinPackParameters: OnePerLine
+BreakBeforeBraces: Attach
+BracedInitializerIndentWidth: 4
+BreakConstructorInitializers: AfterColon
+ColumnLimit: 120
+ContinuationIndentWidth: 4
+Cpp11BracedListStyle: true
+DerivePointerAlignment: false
+EmptyLineBeforeAccessModifier: Always
+IncludeBlocks: Preserve
+IndentWidth: 4
+IndentPPDirectives: None
+InsertNewlineAtEOF: true
+LineEnding: LF
+NamespaceIndentation: None
+PointerAlignment: Left
+SortIncludes: 
+  Enabled: false
+SortUsingDeclarations: Never
+SpaceBeforeParens: ControlStatements
+SpacesInParens: Never
+SpacesInContainerLiterals: false
+SkipMacroDefinitionBody: true
+UseTab: Never
+...
