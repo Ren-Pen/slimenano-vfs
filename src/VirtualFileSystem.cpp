@@ -1,32 +1,32 @@
 #include <slimenano/vfs/VirtualFileSystem.h>
 
-#include <string>
-#include <memory>
-#include <vector>
 #include <functional>
 #include <map>
-#include <utility>
 #include <optional>
 #include <set>
-
-#include <slimenano/vfs/Path.h>
-#include <slimenano/vfs/FileSystem.h>
-#include <slimenano/vfs/FileHandle.h>
+#include <chrono>
 
 namespace slimenano::filesystem {
 
 namespace {
+
+namespace chrono = std::chrono;
+
 const Path kRoot{"/"};
-}
+} // namespace
 
 struct VirtualFileSystem::Impl {
 
     struct Node {
 
         Node(const std::shared_ptr<Node>& parent, std::string_view path) :
-            parent(parent), absolutePath(parent ? parent->absolutePath / path : path) {};
+            parent(parent), absolutePath(parent ? parent->absolutePath / path : path),
+            creationTime(
+                chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count()
+            ) {};
         std::weak_ptr<Node> parent;
         Path absolutePath;
+        std::int64_t creationTime;
         std::vector<std::shared_ptr<FileSystem>> fileSystems{};
         std::map<std::string, std::shared_ptr<Node>, std::less<>> children{};
     };
@@ -71,6 +71,7 @@ struct VirtualFileSystem::Impl {
     struct VirtualFileNode {
         std::shared_ptr<FileSystem> fs;
         Path path;
+        std::int64_t creationTime;
     };
 
     std::pair<std::shared_ptr<Node>, bool> ResolveNode(const Path& absolutePath) const {
@@ -96,12 +97,14 @@ struct VirtualFileSystem::Impl {
         auto [node, exact] = ResolveNode(absolutePath);
 
         if (exact && node->fileSystems.empty()) {
-            return VirtualFileNode{nullptr, absolutePath};
+            return VirtualFileNode{nullptr, absolutePath, node->creationTime};
         }
 
         while (node) {
             if (!node->fileSystems.empty()) {
-                return VirtualFileNode{node->fileSystems.back(), absolutePath.ToRelative(node->absolutePath)};
+                return VirtualFileNode{
+                    node->fileSystems.back(), absolutePath.ToRelative(node->absolutePath), node->creationTime
+                };
             }
             node = node->parent.lock();
         }
@@ -114,7 +117,7 @@ struct VirtualFileSystem::Impl {
         auto [node, exact] = ResolveNode(absolutePath);
 
         if (exact && node->fileSystems.empty()) {
-            return VirtualFileNode{nullptr, absolutePath};
+            return VirtualFileNode{nullptr, absolutePath, node->creationTime};
         }
 
         while (node) {
@@ -124,7 +127,7 @@ struct VirtualFileSystem::Impl {
                     std::error_code fsEc;
                     if ((*it)->Exists(rel, fsEc)) {
                         ec.clear();
-                        return VirtualFileNode{*it, rel};
+                        return VirtualFileNode{*it, rel, node->creationTime};
                     }
                     if (!ec && fsEc) {
                         ec = fsEc;
@@ -260,8 +263,8 @@ std::vector<std::shared_ptr<FileSystem>> VirtualFileSystem::GetMountedFileSystem
     return node->fileSystems;
 }
 
-bool VirtualFileSystem::Initialize() const {
-    return true;
+void VirtualFileSystem::Initialize(std::error_code& ec) const {
+    ec.clear();
 }
 
 bool VirtualFileSystem::Exists(const Path& path, std::error_code& ec) const {
@@ -274,9 +277,72 @@ FileInfo VirtualFileSystem::Stat(const Path& path, std::error_code& ec) const {
         return {};
     }
     if (!vfNode->fs) {
-        return {.type = FileType::Directory, .readable = true, .writable = false, .size = 0};
+        return {
+            .type = FileType::Directory,
+            .readable = true,
+            .writable = false,
+            .size = 0,
+            .createdTime = vfNode->creationTime,
+            .modifiedTime = vfNode->creationTime,
+            .accessedTime = 0
+        };
     }
     return vfNode->fs->Stat(vfNode->path, ec);
+}
+
+bool VirtualFileSystem::IsDirectory(const Path& path, std::error_code& ec) const {
+    auto vfNode = m_impl->ResolveIfExist(path, ec);
+    if (!vfNode) {
+        return false;
+    }
+    if (!vfNode->fs) {
+        return true;
+    }
+    return vfNode->fs->IsDirectory(vfNode->path, ec);
+}
+
+bool VirtualFileSystem::IsRegularFile(const Path& path, std::error_code& ec) const {
+    auto vfNode = m_impl->ResolveIfExist(path, ec);
+    if (!vfNode) {
+        return false;
+    }
+    if (!vfNode->fs) {
+        return false;
+    }
+    return vfNode->fs->IsRegularFile(vfNode->path, ec);
+}
+
+bool VirtualFileSystem::IsReadable(const Path& path, std::error_code& ec) const {
+    auto vfNode = m_impl->ResolveIfExist(path, ec);
+    if (!vfNode) {
+        return false;
+    }
+    if (!vfNode->fs) {
+        return true;
+    }
+    return vfNode->fs->IsReadable(vfNode->path, ec);
+}
+
+bool VirtualFileSystem::IsWritable(const Path& path, std::error_code& ec) const {
+    auto vfNode = m_impl->ResolveIfExist(path, ec);
+    if (!vfNode) {
+        return false;
+    }
+    if (!vfNode->fs) {
+        return false;
+    }
+    return vfNode->fs->IsWritable(vfNode->path, ec);
+}
+
+std::uint64_t VirtualFileSystem::Size(const Path& path, std::error_code& ec) const {
+    auto vfNode = m_impl->ResolveIfExist(path, ec);
+    if (!vfNode) {
+        return 0;
+    }
+    if (!vfNode->fs) {
+        return 0;
+    }
+    return vfNode->fs->Size(vfNode->path, ec);
 }
 
 std::vector<std::string> VirtualFileSystem::List(const Path& path, std::error_code& ec) const {

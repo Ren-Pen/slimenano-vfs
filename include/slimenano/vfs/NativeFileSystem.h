@@ -1,53 +1,34 @@
 #ifndef SLIMENANO_VFS_INCLUDE_VFS_VIRTUAL_FILE_SYSTEM_H
 #define SLIMENANO_VFS_INCLUDE_VFS_VIRTUAL_FILE_SYSTEM_H
 
-#include <type_traits>
-#include <utility>
-
 #include <slimenano/vfs/FileSystem.h>
+
+#include <filesystem>
 
 namespace slimenano::filesystem {
 
-class VirtualFileSystem final : public FileSystem {
+class NativeFileSystem final : public FileSystem {
 
 public:
-    VirtualFileSystem();
-    virtual ~VirtualFileSystem();
+    explicit NativeFileSystem(std::string_view root) : m_root(root) {}
+    ~NativeFileSystem() = default;
 
-    void Mount(const Path& mountPoint, std::shared_ptr<FileSystem> ptr);
-
-    template <typename T, typename... Args>
-    std::shared_ptr<FileSystem> CreateAndMount(const Path& mountPoint, Args&&... args) {
-        static_assert(std::is_base_of_v<FileSystem, T>, "T must derive from FileSystem");
-        auto ptr = std::make_shared<T>(std::forward<Args>(args)...);
-        if (!ptr) {
-            return nullptr;
-        }
-
-        if (!ptr->Initialize()) {
-            return nullptr;
-        }
-
-        Mount(mountPoint, ptr);
-        return ptr;
-    }
-
-    [[nodiscard]] bool IsMounted(const Path& mountPoint) const;
-    [[nodiscard]] bool IsMounted(const Path& mountPoint, const std::shared_ptr<FileSystem>& ptr) const;
-    void Unmount(const Path& mountPoint);
-    void Unmount(const Path& mountPoint, const std::shared_ptr<FileSystem>& ptr);
-    [[nodiscard]] std::vector<std::shared_ptr<FileSystem>> GetMountedFileSystems(const Path& mountPoint) const;
+    NativeFileSystem(const NativeFileSystem&) = delete;
+    NativeFileSystem(NativeFileSystem&&) = delete;
+    NativeFileSystem& operator=(const NativeFileSystem&) = delete;
+    NativeFileSystem& operator=(NativeFileSystem&&) = delete;
 
     void Initialize(std::error_code& ec) const override;
-    [[nodiscard]] bool Exists(const Path& path, std::error_code& ec) const override;
+
     [[nodiscard]] FileInfo Stat(const Path& path, std::error_code& ec) const override;
+    [[nodiscard]] bool Exists(const Path& path, std::error_code& ec) const override;
     [[nodiscard]] bool IsDirectory(const Path& path, std::error_code& ec) const override;
     [[nodiscard]] bool IsRegularFile(const Path& path, std::error_code& ec) const override;
     [[nodiscard]] bool IsReadable(const Path& path, std::error_code& ec) const override;
     [[nodiscard]] bool IsWritable(const Path& path, std::error_code& ec) const override;
     [[nodiscard]] std::uint64_t Size(const Path& path, std::error_code& ec) const override;
-
     [[nodiscard]] std::vector<std::string> List(const Path& path, std::error_code& ec) const override;
+
     void CreateFile(const Path& path, std::error_code& ec) override;
     void CreateDirectory(const Path& path, std::error_code& ec) override;
     void CreateDirectories(const Path& path, std::error_code& ec) override;
@@ -59,8 +40,13 @@ public:
     Open(const Path& path, OpenOption openOptions, std::error_code& ec) override;
 
 private:
-    struct Impl;
-    std::unique_ptr<Impl> m_impl;
+    std::filesystem::path m_root;
+
+    std::filesystem::path ToNativePath(const Path& path) const {
+        const auto absolutePath = path.ToAbsolute("/");
+        auto rel = absolutePath.String().substr(1);
+        return m_root / std::filesystem::path(rel);
+    }
 };
 
 } // namespace slimenano::filesystem

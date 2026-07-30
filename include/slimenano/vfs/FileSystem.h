@@ -24,33 +24,17 @@ public:
     FileSystem(FileSystem&&) noexcept = delete;
     FileSystem& operator=(FileSystem&&) noexcept = delete;
 
-    [[nodiscard]] virtual bool Initialize() const = 0;
+    virtual void Initialize(std::error_code& ec) const = 0;
 
     [[nodiscard]] virtual FileInfo Stat(const Path& path, std::error_code& ec) const = 0;
     [[nodiscard]] virtual bool Exists(const Path& path, std::error_code& ec) const = 0;
-
-    [[nodiscard]] virtual bool IsDirectory(const Path& path, std::error_code& ec) const {
-        auto info = Stat(path, ec);
-        return !ec && info.IsDirectory();
-    }
-    [[nodiscard]] virtual bool IsRegularFile(const Path& path, std::error_code& ec) const {
-        auto info = Stat(path, ec);
-        return !ec && info.IsRegularFile();
-    }
-    [[nodiscard]] virtual bool IsReadable(const Path& path, std::error_code& ec) const {
-        auto info = Stat(path, ec);
-        return !ec && info.Exists() && info.readable;
-    }
-    [[nodiscard]] virtual bool IsWritable(const Path& path, std::error_code& ec) const {
-        auto info = Stat(path, ec);
-        return !ec && info.Exists() && info.writable;
-    }
-    [[nodiscard]] virtual std::uint64_t Size(const Path& path, std::error_code& ec) const {
-        auto info = Stat(path, ec);
-        return ec ? 0 : info.size;
-    }
-
+    [[nodiscard]] virtual bool IsDirectory(const Path& path, std::error_code& ec) const;
+    [[nodiscard]] virtual bool IsRegularFile(const Path& path, std::error_code& ec) const;
+    [[nodiscard]] virtual bool IsReadable(const Path& path, std::error_code& ec) const;
+    [[nodiscard]] virtual bool IsWritable(const Path& path, std::error_code& ec) const;
+    [[nodiscard]] virtual std::uint64_t Size(const Path& path, std::error_code& ec) const;
     [[nodiscard]] virtual std::vector<std::string> List(const Path& path, std::error_code& ec) const = 0;
+
     virtual void CreateFile(const Path& path, std::error_code& ec) = 0;
     virtual void CreateDirectory(const Path& path, std::error_code& ec) = 0;
     virtual void CreateDirectories(const Path& path, std::error_code& ec) = 0;

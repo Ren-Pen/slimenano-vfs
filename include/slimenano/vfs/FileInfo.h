@@ -18,6 +18,10 @@ struct FileInfo {
     bool writable{false};
     std::uint64_t size{0};
 
+    std::int64_t createdTime{0};
+    std::int64_t modifiedTime{0};
+    std::int64_t accessedTime{0};
+
     [[nodiscard]] bool Exists() const noexcept { return type != FileType::None; }
     [[nodiscard]] bool IsDirectory() const noexcept { return type == FileType::Directory; }
     [[nodiscard]] bool IsRegularFile() const noexcept { return type == FileType::Regular; }
