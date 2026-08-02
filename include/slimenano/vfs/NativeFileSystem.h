@@ -233,6 +233,12 @@ public:
     [[nodiscard]] std::unique_ptr<FileHandle>
     Open(const Path& path, OpenOption openOptions, std::error_code& ec) override;
 
+    /**
+     * @brief Brings the base-class convenience overload Open(path, ec) into
+     *        scope for this class.
+     */
+    using FileSystem::Open;
+
 private:
     /** @brief Native path of the root directory. */
     std::filesystem::path m_root;

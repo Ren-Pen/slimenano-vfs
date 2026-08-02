@@ -328,6 +328,12 @@ public:
     [[nodiscard]] std::unique_ptr<FileHandle>
     Open(const Path& path, OpenOption openOptions, std::error_code& ec) override;
 
+    /**
+     * @brief Brings the base-class convenience overload Open(path, ec) into
+     *        scope for this class.
+     */
+    using FileSystem::Open;
+
 private:
     struct Impl;
     std::unique_ptr<Impl> m_impl;
