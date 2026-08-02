@@ -1,3 +1,8 @@
+/**
+ * @file NativeFileSystem.cpp
+ * @brief Implementation of the native file system.
+ */
+
 #include <slimenano/vfs/NativeFileSystem.h>
 
 #include "NativeFileHandle.h"
@@ -14,6 +19,16 @@ namespace chrono = std::chrono;
 
 namespace {
 
+/**
+ * @brief Converts a UTF-8 string view to a native filesystem path.
+ *
+ * The conversion goes through the C++20 char8_t path constructor so that
+ * non-ASCII characters are preserved on Windows.
+ *
+ * @param utf8 The UTF-8 path to convert.
+ *
+ * @return The native path; empty when @p utf8 is empty.
+ */
 fs::path FromUtf8(std::string_view utf8) {
     if (utf8.empty()) {
         return {};
@@ -21,11 +36,29 @@ fs::path FromUtf8(std::string_view utf8) {
     return fs::path(std::u8string_view(reinterpret_cast<const char8_t*>(utf8.data()), utf8.size()));
 }
 
+/**
+ * @brief Converts a native filesystem path to a UTF-8 string.
+ *
+ * @param native The native path to convert.
+ *
+ * @return The path as a UTF-8 string.
+ */
 std::string ToUtf8(const fs::path& native) {
     const auto utf8 = native.u8string();
     return std::string(reinterpret_cast<const char*>(utf8.data()), utf8.size());
 }
 
+/**
+ * @brief Maps a virtual path to a native path below a root directory.
+ *
+ * The virtual path is made absolute, and the leading root separator is
+ * stripped before appending to the root.
+ *
+ * @param root Native root directory.
+ * @param path Virtual path to map.
+ *
+ * @return The native path below @p root.
+ */
 fs::path ToNativePath(const fs::path& root, const Path& path) {
     const auto absolutePath = path.ToAbsolute("/");
     const auto rel = absolutePath.String().substr(1);
@@ -34,9 +67,20 @@ fs::path ToNativePath(const fs::path& root, const Path& path) {
 
 } // namespace
 
+/**
+ * @brief Constructs a native file system rooted at @p root.
+ *
+ * @param root UTF-8 path of the backing directory on disk.
+ */
 NativeFileSystem::NativeFileSystem(std::string_view root) : m_root(FromUtf8(root)) {
 }
 
+/**
+ * @brief Validates that the root directory exists and is a directory.
+ *
+ * @param ec On failure, set to std::errc::not_a_directory when the root is
+ *           missing or is not a directory.
+ */
 void NativeFileSystem::Initialize(std::error_code& ec) const {
     ec.clear();
     auto is_dir = fs::is_directory(m_root, ec);
@@ -48,6 +92,15 @@ void NativeFileSystem::Initialize(std::error_code& ec) const {
     }
 }
 
+/**
+ * @brief Returns metadata about the entry at @p path.
+ *
+ * @param path The virtual path to query.
+ * @param ec   On failure, set to an error code describing the problem.
+ *
+ * @return The entry's metadata; an empty FileInfo when no entry exists at
+ *         @p path.
+ */
 FileInfo NativeFileSystem::Stat(const Path& path, std::error_code& ec) const {
     ec.clear();
     const auto nativePath = ToNativePath(m_root, path);
@@ -104,24 +157,58 @@ FileInfo NativeFileSystem::Stat(const Path& path, std::error_code& ec) const {
     return info;
 }
 
+/**
+ * @brief Checks whether an entry exists at @p path.
+ *
+ * @param path The virtual path to query.
+ * @param ec   On failure, set to an error code describing the problem.
+ *
+ * @return true when an entry exists at @p path.
+ */
 bool NativeFileSystem::Exists(const Path& path, std::error_code& ec) const {
     ec.clear();
     const auto nativePath = ToNativePath(m_root, path);
     return fs::exists(nativePath, ec);
 }
 
+/**
+ * @brief Checks whether the entry at @p path is a directory.
+ *
+ * @param path The virtual path to query.
+ * @param ec   On failure, set to an error code describing the problem.
+ *
+ * @return true when the entry at @p path is a directory.
+ */
 bool NativeFileSystem::IsDirectory(const Path& path, std::error_code& ec) const {
     ec.clear();
     const auto nativePath = ToNativePath(m_root, path);
     return fs::is_directory(nativePath, ec);
 }
 
+/**
+ * @brief Checks whether the entry at @p path is a regular file.
+ *
+ * @param path The virtual path to query.
+ * @param ec   On failure, set to an error code describing the problem.
+ *
+ * @return true when the entry at @p path is a regular file.
+ */
 bool NativeFileSystem::IsRegularFile(const Path& path, std::error_code& ec) const {
     ec.clear();
     const auto nativePath = ToNativePath(m_root, path);
     return fs::is_regular_file(nativePath, ec);
 }
 
+/**
+ * @brief Checks whether the entry at @p path can be read.
+ *
+ * Readability is derived from the owner read permission bit.
+ *
+ * @param path The virtual path to query.
+ * @param ec   On failure, set to an error code describing the problem.
+ *
+ * @return true when the entry is readable.
+ */
 bool NativeFileSystem::IsReadable(const Path& path, std::error_code& ec) const {
     ec.clear();
     const auto nativePath = ToNativePath(m_root, path);
@@ -133,6 +220,16 @@ bool NativeFileSystem::IsReadable(const Path& path, std::error_code& ec) const {
     return (perms & fs::perms::owner_read) != fs::perms::none;
 }
 
+/**
+ * @brief Checks whether the entry at @p path can be written.
+ *
+ * Writability is derived from the owner write permission bit.
+ *
+ * @param path The virtual path to query.
+ * @param ec   On failure, set to an error code describing the problem.
+ *
+ * @return true when the entry is writable.
+ */
 bool NativeFileSystem::IsWritable(const Path& path, std::error_code& ec) const {
     ec.clear();
     const auto nativePath = ToNativePath(m_root, path);
@@ -144,6 +241,15 @@ bool NativeFileSystem::IsWritable(const Path& path, std::error_code& ec) const {
     return (perms & fs::perms::owner_write) != fs::perms::none;
 }
 
+/**
+ * @brief Returns the size of the entry at @p path in bytes.
+ *
+ * @param path The virtual path to query.
+ * @param ec   On failure, set to an error code describing the problem.
+ *
+ * @return The size in bytes; zero when the entry does not exist or is not a
+ *         regular file.
+ */
 std::uint64_t NativeFileSystem::Size(const Path& path, std::error_code& ec) const {
     ec.clear();
     const auto nativePath = ToNativePath(m_root, path);
@@ -154,6 +260,17 @@ std::uint64_t NativeFileSystem::Size(const Path& path, std::error_code& ec) cons
     return static_cast<std::uint64_t>(size);
 }
 
+/**
+ * @brief Lists the names of the entries directly contained in @p path.
+ *
+ * The names are returned in the iteration order of the underlying
+ * directory, without sorting.
+ *
+ * @param path The virtual path of the directory to list.
+ * @param ec   On failure, set to an error code describing the problem.
+ *
+ * @return The entry names as UTF-8 strings, excluding "." and "..".
+ */
 std::vector<std::string> NativeFileSystem::List(const Path& path, std::error_code& ec) const {
     ec.clear();
     const auto nativePath = ToNativePath(m_root, path);
@@ -169,6 +286,14 @@ std::vector<std::string> NativeFileSystem::List(const Path& path, std::error_cod
     return names;
 }
 
+/**
+ * @brief Creates a new file at @p path.
+ *
+ * Does nothing when the file already exists.
+ *
+ * @param path The virtual path of the file to create.
+ * @param ec   On failure, set to an error code describing the problem.
+ */
 void NativeFileSystem::CreateFile(const Path& path, std::error_code& ec) {
     ec.clear();
     const auto nativePath = ToNativePath(m_root, path);
@@ -187,31 +312,80 @@ void NativeFileSystem::CreateFile(const Path& path, std::error_code& ec) {
     }
 }
 
+/**
+ * @brief Creates a single directory at @p path.
+ *
+ * Does nothing when the directory already exists.
+ *
+ * @param path The virtual path of the directory to create.
+ * @param ec   On failure, set to an error code describing the problem.
+ */
 void NativeFileSystem::CreateDirectory(const Path& path, std::error_code& ec) {
     ec.clear();
     fs::create_directory(ToNativePath(m_root, path), ec);
 }
 
+/**
+ * @brief Creates the directory at @p path and any missing parent
+ *        directories.
+ *
+ * @param path The virtual path of the directory to create.
+ * @param ec   On failure, set to an error code describing the problem.
+ */
 void NativeFileSystem::CreateDirectories(const Path& path, std::error_code& ec) {
     ec.clear();
     fs::create_directories(ToNativePath(m_root, path), ec);
 }
 
+/**
+ * @brief Deletes the file at @p path.
+ *
+ * Does nothing when the file does not exist.
+ *
+ * @param path The virtual path of the file to delete.
+ * @param ec   On failure, set to an error code describing the problem.
+ */
 void NativeFileSystem::DeleteFile(const Path& path, std::error_code& ec) {
     ec.clear();
     fs::remove(ToNativePath(m_root, path), ec);
 }
 
+/**
+ * @brief Deletes the empty directory at @p path.
+ *
+ * Does nothing when the directory does not exist, and fails when it is not
+ * empty.
+ *
+ * @param path The virtual path of the directory to delete.
+ * @param ec   On failure, set to an error code describing the problem.
+ */
 void NativeFileSystem::DeleteDirectory(const Path& path, std::error_code& ec) {
     ec.clear();
     fs::remove(ToNativePath(m_root, path), ec);
 }
 
+/**
+ * @brief Recursively deletes the directory at @p path and everything it
+ *        contains.
+ *
+ * @param path The virtual path of the directory to delete.
+ * @param ec   On failure, set to an error code describing the problem.
+ */
 void NativeFileSystem::DeleteDirectories(const Path& path, std::error_code& ec) {
     ec.clear();
     fs::remove_all(ToNativePath(m_root, path), ec);
 }
 
+/**
+ * @brief Opens the file at @p path and returns a handle to it.
+ *
+ * @param path        The virtual path of the file to open.
+ * @param openOptions Flags controlling access mode and creation.
+ * @param ec          On failure, set to an error code describing the
+ *                    problem.
+ *
+ * @return A handle to the open file, or nullptr on failure.
+ */
 std::unique_ptr<FileHandle> NativeFileSystem::Open(const Path& path, OpenOption openOptions, std::error_code& ec) {
     ec.clear();
     auto handle = std::make_unique<NativeFileHandle>(ToNativePath(m_root, path), openOptions, ec);

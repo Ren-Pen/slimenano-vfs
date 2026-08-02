@@ -1,3 +1,9 @@
+/**
+ * @file pch.h
+ * @brief Precompiled header aggregating the standard headers used by the
+ *        library sources.
+ */
+
 #ifndef SLIMENANO_VFS_SRC_PCH_H
 #define SLIMENANO_VFS_SRC_PCH_H
 

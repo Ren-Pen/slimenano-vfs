@@ -14,9 +14,9 @@ set(TARGET ${NAMESPACE}_${TARGET_NAME})
 add_library(${TARGET}
 "src/pch.cpp"
 "src/Path.cpp"
-"src/VirtualFileSystem.cpp"
-"src/NativeFileSystem.cpp"
-"src/NativeFileHandle.cpp"
+"src/Virtual/VirtualFileSystem.cpp"
+"src/Native/NativeFileSystem.cpp"
+"src/Native/NativeFileHandle.cpp"
 )
 
 add_library(${NAMESPACE}::${TARGET_NAME} ALIAS ${TARGET})
