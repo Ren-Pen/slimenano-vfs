@@ -28,11 +28,11 @@ public:
 
     [[nodiscard]] virtual FileInfo Stat(const Path& path, std::error_code& ec) const = 0;
     [[nodiscard]] virtual bool Exists(const Path& path, std::error_code& ec) const = 0;
-    [[nodiscard]] virtual bool IsDirectory(const Path& path, std::error_code& ec) const;
-    [[nodiscard]] virtual bool IsRegularFile(const Path& path, std::error_code& ec) const;
-    [[nodiscard]] virtual bool IsReadable(const Path& path, std::error_code& ec) const;
-    [[nodiscard]] virtual bool IsWritable(const Path& path, std::error_code& ec) const;
-    [[nodiscard]] virtual std::uint64_t Size(const Path& path, std::error_code& ec) const;
+    [[nodiscard]] virtual bool IsDirectory(const Path& path, std::error_code& ec) const = 0;
+    [[nodiscard]] virtual bool IsRegularFile(const Path& path, std::error_code& ec) const = 0;
+    [[nodiscard]] virtual bool IsReadable(const Path& path, std::error_code& ec) const = 0;
+    [[nodiscard]] virtual bool IsWritable(const Path& path, std::error_code& ec) const = 0;
+    [[nodiscard]] virtual std::uint64_t Size(const Path& path, std::error_code& ec) const = 0;
     [[nodiscard]] virtual std::vector<std::string> List(const Path& path, std::error_code& ec) const = 0;
 
     virtual void CreateFile(const Path& path, std::error_code& ec) = 0;

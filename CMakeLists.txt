@@ -15,6 +15,8 @@ add_library(${TARGET}
 "src/pch.cpp"
 "src/Path.cpp"
 "src/VirtualFileSystem.cpp"
+"src/NativeFileSystem.cpp"
+"src/NativeFileHandle.cpp"
 )
 
 add_library(${NAMESPACE}::${TARGET_NAME} ALIAS ${TARGET})
@@ -27,7 +29,9 @@ target_include_directories(${TARGET}
 target_compile_features(${TARGET} PUBLIC cxx_std_20)
 
 if(MSVC)
-  target_compile_options(${TARGET} PRIVATE /W4 /WX)
+  # /utf-8: treat source files and narrow string literals as UTF-8 instead of
+  # the ANSI code page, matching the VFS path encoding contract.
+  target_compile_options(${TARGET} PRIVATE /W4 /WX /utf-8)
 else()
   target_compile_options(${TARGET} PRIVATE -Wall -Wextra -Wpedantic -Werror)
 endif()

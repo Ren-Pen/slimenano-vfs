@@ -10,7 +10,7 @@ namespace slimenano::filesystem {
 class NativeFileSystem final : public FileSystem {
 
 public:
-    explicit NativeFileSystem(std::string_view root) : m_root(root) {}
+    explicit NativeFileSystem(std::string_view root);
     ~NativeFileSystem() = default;
 
     NativeFileSystem(const NativeFileSystem&) = delete;
@@ -41,12 +41,6 @@ public:
 
 private:
     std::filesystem::path m_root;
-
-    std::filesystem::path ToNativePath(const Path& path) const {
-        const auto absolutePath = path.ToAbsolute("/");
-        auto rel = absolutePath.String().substr(1);
-        return m_root / std::filesystem::path(rel);
-    }
 };
 
 } // namespace slimenano::filesystem
