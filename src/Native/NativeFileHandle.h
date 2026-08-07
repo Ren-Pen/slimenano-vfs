@@ -14,6 +14,12 @@
 
 namespace slimenano::filesystem {
 
+enum class StreamMode : std::int8_t {
+    None,
+    Read,
+    Write
+};
+
 /**
  * @brief FileHandle implementation backed by a std::fstream.
  *
@@ -103,14 +109,22 @@ public:
     void Close(std::error_code& ec) override;
 
 private:
+    void SwitchStreamMode(StreamMode mode, std::error_code& ec);
+    void ResetStreamMode();
+
+private:
     /** @brief Underlying binary stream. */
     std::fstream m_stream;
     /** @brief Whether the handle supports reading. */
-    bool m_readable = false;
+    bool m_readable{false};
     /** @brief Whether the handle supports writing. */
-    bool m_writable = false;
+    bool m_writable{false};
     /** @brief Whether the handle has been closed. */
-    bool m_closed = false;
+    bool m_closed{false};
+
+    std::ios::pos_type m_pos{0};
+
+    StreamMode m_curMode{StreamMode::None};
 };
 
 } // namespace slimenano::filesystem

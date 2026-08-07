@@ -5,11 +5,48 @@
 
 #include "NativeFileHandle.h"
 
-#include <system_error>
+#include <limits>
 
 namespace slimenano::filesystem {
 
+namespace {
 namespace fs = std::filesystem;
+
+inline void
+doSeek(std::fstream& stream, StreamMode mode, std::ios::off_type offset, std::ios::seekdir dir, std::error_code& ec) {
+    ec.clear();
+    if (mode == StreamMode::None) {
+        ec = std::make_error_code(std::errc::invalid_argument);
+        return;
+    } else if (mode == StreamMode::Read) {
+        stream.seekg(offset, dir);
+    } else {
+        stream.seekp(offset, dir);
+    }
+    if (stream.fail()) {
+        ec = std::make_error_code(std::errc::io_error);
+        stream.clear();
+    }
+}
+
+} // namespace
+
+void NativeFileHandle::SwitchStreamMode(StreamMode mode, std::error_code& ec) {
+    ec.clear();
+    if (m_curMode == mode) {
+        return;
+    }
+    doSeek(m_stream, mode, m_pos, std::ios::beg, ec);
+    if (ec) {
+        ResetStreamMode();
+        return;
+    }
+    m_curMode = mode;
+}
+
+void NativeFileHandle::ResetStreamMode() {
+    m_curMode = StreamMode::None;
+}
 
 /**
  * @brief Opens the native file.
@@ -60,17 +97,28 @@ NativeFileHandle::NativeFileHandle(std::filesystem::path path, OpenOption option
     }
     if (m_writable) {
         mode |= std::ios::out;
-    }
-    if (append) {
-        mode |= std::ios::app;
-    }
-    if (truncate) {
-        mode |= std::ios::trunc;
+        if (append) {
+            mode |= std::ios::ate;
+        }
+        if (truncate) {
+            mode |= std::ios::trunc;
+        }
     }
 
     m_stream.open(path, mode);
     if (!m_stream.is_open()) {
         ec = std::make_error_code(std::errc::io_error);
+        return;
+    }
+
+    if (append) {
+        const auto pos = m_stream.tellp();
+        if (m_stream.fail() || pos < 0) {
+            m_stream.close();
+            ec = std::make_error_code(std::errc::io_error);
+            return;
+        }
+        m_pos = pos;
     }
 }
 
@@ -89,18 +137,33 @@ std::size_t NativeFileHandle::Read(std::span<std::byte> buffer, std::error_code&
         ec = std::make_error_code(std::errc::bad_file_descriptor);
         return 0;
     }
-    if (!buffer.empty()) {
-        m_stream.read(reinterpret_cast<char*>(buffer.data()), static_cast<std::streamsize>(buffer.size()));
+    if (buffer.empty()) {
+        return 0;
+    }
+    if (buffer.size() > static_cast<std::size_t>(std::numeric_limits<std::streamsize>::max())) {
+        ec = std::make_error_code(std::errc::value_too_large);
+        return 0;
+    }
+
+    SwitchStreamMode(StreamMode::Read, ec);
+    if (ec) {
+        return 0;
+    }
+
+    m_stream.read(reinterpret_cast<char*>(buffer.data()), static_cast<std::streamsize>(buffer.size()));
+
+    const auto state = m_stream.rdstate();
+    if (state & std::ios::badbit) {
+        ec = std::make_error_code(std::errc::io_error);
+        ResetStreamMode();
+        m_stream.clear();
+        return 0;
+    }
+    if (state != std::ios::goodbit) {
+        m_stream.clear();
     }
     const auto count = m_stream.gcount();
-    const auto state = m_stream.rdstate();
-    if (state != std::ios::goodbit) {
-        const bool eof = (state & std::ios::eofbit) != 0;
-        m_stream.clear();
-        if (!eof) {
-            ec = std::make_error_code(std::errc::io_error);
-        }
-    }
+    m_pos += count;
     return static_cast<std::size_t>(count);
 }
 
@@ -118,15 +181,30 @@ std::size_t NativeFileHandle::Write(std::span<const std::byte> buffer, std::erro
         ec = std::make_error_code(std::errc::bad_file_descriptor);
         return 0;
     }
-    if (!buffer.empty()) {
-        m_stream.write(reinterpret_cast<const char*>(buffer.data()), static_cast<std::streamsize>(buffer.size()));
-    }
-    if (m_stream.fail()) {
-        m_stream.clear();
-        ec = std::make_error_code(std::errc::io_error);
+    if (buffer.empty()) {
         return 0;
     }
-    return buffer.size();
+    if (buffer.size() > static_cast<std::size_t>(std::numeric_limits<std::streamsize>::max())) {
+        ec = std::make_error_code(std::errc::value_too_large);
+        return 0;
+    }
+
+    SwitchStreamMode(StreamMode::Write, ec);
+    if (ec) {
+        return 0;
+    }
+
+    m_stream.write(reinterpret_cast<const char*>(buffer.data()), static_cast<std::streamsize>(buffer.size()));
+
+    if (m_stream.fail()) {
+        ec = std::make_error_code(std::errc::io_error);
+        ResetStreamMode();
+        m_stream.clear();
+        return 0;
+    }
+    const auto count = buffer.size();
+    m_pos += static_cast<std::ios::off_type>(count);
+    return count;
 }
 
 /**
@@ -143,25 +221,78 @@ std::size_t NativeFileHandle::Write(std::span<const std::byte> buffer, std::erro
  */
 std::uint64_t NativeFileHandle::Seek(std::int64_t offset, SeekOrigin origin, std::error_code& ec) {
     ec.clear();
-    if (m_closed) {
+    if (m_closed || (!m_readable && !m_writable)) {
         ec = std::make_error_code(std::errc::bad_file_descriptor);
         return 0;
     }
-    const auto dir = origin == SeekOrigin::Begin ? std::ios::beg
-                     : origin == SeekOrigin::End ? std::ios::end
-                                                 : std::ios::cur;
-    if (m_readable) {
-        m_stream.seekg(offset, dir);
+
+    StreamMode mode = m_curMode;
+
+    if (mode == StreamMode::None) {
+        if (m_readable) {
+            mode = StreamMode::Read;
+        } else if (m_writable) {
+            mode = StreamMode::Write;
+        }
     }
-    if (m_writable) {
-        m_stream.seekp(offset, dir);
+
+    if (origin == SeekOrigin::Begin) {
+        if (offset < 0) {
+            ec = std::make_error_code(std::errc::invalid_seek);
+            return 0;
+        }
+        doSeek(m_stream, mode, offset, std::ios::beg, ec);
+        if (ec) {
+            ResetStreamMode();
+            return 0;
+        }
+        m_pos = static_cast<std::ios::off_type>(offset);
+    } else {
+
+        decltype(m_pos) newOffset = static_cast<decltype(m_pos)>(offset);
+        const auto dir = origin == SeekOrigin::End ? std::ios::end : std::ios::beg;
+
+        if (origin == SeekOrigin::Current) {
+            if (offset > 0 && m_pos > std::numeric_limits<decltype(m_pos)>::max() - offset) {
+                ec = std::make_error_code(std::errc::value_too_large);
+                return 0;
+            }
+            if (offset < 0 && m_pos < std::numeric_limits<decltype(m_pos)>::min() - offset) {
+                ec = std::make_error_code(std::errc::value_too_large);
+                return 0;
+            }
+
+            newOffset += m_pos;
+            if (newOffset < 0) {
+                ec = std::make_error_code(std::errc::invalid_seek);
+                return 0;
+            }
+        }
+
+        doSeek(m_stream, mode, newOffset, dir, ec);
+        if (ec) {
+            ResetStreamMode();
+            return 0;
+        }
+
+        decltype(m_pos) newPos{0};
+        if (mode == StreamMode::Read) {
+            newPos = m_stream.tellg();
+        } else {
+            newPos = m_stream.tellp();
+        }
+        if (m_stream.fail() || newPos < 0) {
+            ec = std::make_error_code(std::errc::io_error);
+            ResetStreamMode();
+            m_stream.clear();
+            return 0;
+        }
+        m_pos = newPos;
     }
-    if (m_stream.fail()) {
-        m_stream.clear();
-        ec = std::make_error_code(std::errc::io_error);
-        return 0;
-    }
-    return Tell(ec);
+
+    m_curMode = mode;
+
+    return m_pos;
 }
 
 /**
