@@ -8,8 +8,6 @@
 
 #include <slimenano/vfs/FileSystem.h>
 
-#include <filesystem>
-
 namespace slimenano::filesystem {
 
 /**
@@ -240,8 +238,8 @@ public:
     using FileSystem::Open;
 
 private:
-    /** @brief Native path of the root directory. */
-    std::filesystem::path m_root;
+    struct Impl;
+    std::unique_ptr<Impl> m_pImpl;
 };
 
 } // namespace slimenano::filesystem

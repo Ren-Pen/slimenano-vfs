@@ -7,6 +7,7 @@
 
 #include "NativeFileHandle.h"
 
+#include <filesystem>
 #include <chrono>
 #include <fstream>
 #include <string>
@@ -14,10 +15,10 @@
 
 namespace slimenano::filesystem {
 
+namespace {
+
 namespace fs = std::filesystem;
 namespace chrono = std::chrono;
-
-namespace {
 
 /**
  * @brief Converts a UTF-8 string view to a native filesystem path.
@@ -67,12 +68,19 @@ fs::path ToNativePath(const fs::path& root, const Path& path) {
 
 } // namespace
 
+struct NativeFileSystem::Impl {
+    explicit Impl(fs::path root) : m_root(root) {}
+
+    /** @brief Native path of the root directory. */
+    fs::path m_root;
+};
+
 /**
  * @brief Constructs a native file system rooted at @p root.
  *
  * @param root UTF-8 path of the backing directory on disk.
  */
-NativeFileSystem::NativeFileSystem(std::string_view root) : m_root(FromUtf8(root)) {
+NativeFileSystem::NativeFileSystem(std::string_view root) : m_pImpl(std::make_unique<Impl>(FromUtf8(root))) {
 }
 
 /**
@@ -83,7 +91,7 @@ NativeFileSystem::NativeFileSystem(std::string_view root) : m_root(FromUtf8(root
  */
 void NativeFileSystem::Initialize(std::error_code& ec) const {
     ec.clear();
-    auto is_dir = fs::is_directory(m_root, ec);
+    auto is_dir = fs::is_directory(m_pImpl->m_root, ec);
     if (ec) {
         return;
     }
@@ -103,7 +111,7 @@ void NativeFileSystem::Initialize(std::error_code& ec) const {
  */
 FileInfo NativeFileSystem::Stat(const Path& path, std::error_code& ec) const {
     ec.clear();
-    const auto nativePath = ToNativePath(m_root, path);
+    const auto nativePath = ToNativePath(m_pImpl->m_root, path);
     const auto status = fs::status(nativePath, ec);
     if (ec) {
         return {};
@@ -167,7 +175,7 @@ FileInfo NativeFileSystem::Stat(const Path& path, std::error_code& ec) const {
  */
 bool NativeFileSystem::Exists(const Path& path, std::error_code& ec) const {
     ec.clear();
-    const auto nativePath = ToNativePath(m_root, path);
+    const auto nativePath = ToNativePath(m_pImpl->m_root, path);
     return fs::exists(nativePath, ec);
 }
 
@@ -181,7 +189,7 @@ bool NativeFileSystem::Exists(const Path& path, std::error_code& ec) const {
  */
 bool NativeFileSystem::IsDirectory(const Path& path, std::error_code& ec) const {
     ec.clear();
-    const auto nativePath = ToNativePath(m_root, path);
+    const auto nativePath = ToNativePath(m_pImpl->m_root, path);
     return fs::is_directory(nativePath, ec);
 }
 
@@ -195,7 +203,7 @@ bool NativeFileSystem::IsDirectory(const Path& path, std::error_code& ec) const 
  */
 bool NativeFileSystem::IsRegularFile(const Path& path, std::error_code& ec) const {
     ec.clear();
-    const auto nativePath = ToNativePath(m_root, path);
+    const auto nativePath = ToNativePath(m_pImpl->m_root, path);
     return fs::is_regular_file(nativePath, ec);
 }
 
@@ -211,7 +219,7 @@ bool NativeFileSystem::IsRegularFile(const Path& path, std::error_code& ec) cons
  */
 bool NativeFileSystem::IsReadable(const Path& path, std::error_code& ec) const {
     ec.clear();
-    const auto nativePath = ToNativePath(m_root, path);
+    const auto nativePath = ToNativePath(m_pImpl->m_root, path);
     const auto status = fs::status(nativePath, ec);
     if (ec) {
         return false;
@@ -232,7 +240,7 @@ bool NativeFileSystem::IsReadable(const Path& path, std::error_code& ec) const {
  */
 bool NativeFileSystem::IsWritable(const Path& path, std::error_code& ec) const {
     ec.clear();
-    const auto nativePath = ToNativePath(m_root, path);
+    const auto nativePath = ToNativePath(m_pImpl->m_root, path);
     const auto status = fs::status(nativePath, ec);
     if (ec) {
         return false;
@@ -252,7 +260,7 @@ bool NativeFileSystem::IsWritable(const Path& path, std::error_code& ec) const {
  */
 std::uint64_t NativeFileSystem::Size(const Path& path, std::error_code& ec) const {
     ec.clear();
-    const auto nativePath = ToNativePath(m_root, path);
+    const auto nativePath = ToNativePath(m_pImpl->m_root, path);
     const auto size = fs::file_size(nativePath, ec);
     if (ec) {
         return 0;
@@ -273,7 +281,7 @@ std::uint64_t NativeFileSystem::Size(const Path& path, std::error_code& ec) cons
  */
 std::vector<std::string> NativeFileSystem::List(const Path& path, std::error_code& ec) const {
     ec.clear();
-    const auto nativePath = ToNativePath(m_root, path);
+    const auto nativePath = ToNativePath(m_pImpl->m_root, path);
     auto iter = fs::directory_iterator{nativePath, ec};
     if (ec) {
         return {};
@@ -296,7 +304,7 @@ std::vector<std::string> NativeFileSystem::List(const Path& path, std::error_cod
  */
 void NativeFileSystem::CreateFile(const Path& path, std::error_code& ec) {
     ec.clear();
-    const auto nativePath = ToNativePath(m_root, path);
+    const auto nativePath = ToNativePath(m_pImpl->m_root, path);
 
     std::error_code existsEc;
     if (fs::exists(nativePath, existsEc)) {
@@ -322,7 +330,7 @@ void NativeFileSystem::CreateFile(const Path& path, std::error_code& ec) {
  */
 void NativeFileSystem::CreateDirectory(const Path& path, std::error_code& ec) {
     ec.clear();
-    fs::create_directory(ToNativePath(m_root, path), ec);
+    fs::create_directory(ToNativePath(m_pImpl->m_root, path), ec);
 }
 
 /**
@@ -334,7 +342,7 @@ void NativeFileSystem::CreateDirectory(const Path& path, std::error_code& ec) {
  */
 void NativeFileSystem::CreateDirectories(const Path& path, std::error_code& ec) {
     ec.clear();
-    fs::create_directories(ToNativePath(m_root, path), ec);
+    fs::create_directories(ToNativePath(m_pImpl->m_root, path), ec);
 }
 
 /**
@@ -347,7 +355,7 @@ void NativeFileSystem::CreateDirectories(const Path& path, std::error_code& ec) 
  */
 void NativeFileSystem::DeleteFile(const Path& path, std::error_code& ec) {
     ec.clear();
-    fs::remove(ToNativePath(m_root, path), ec);
+    fs::remove(ToNativePath(m_pImpl->m_root, path), ec);
 }
 
 /**
@@ -361,7 +369,7 @@ void NativeFileSystem::DeleteFile(const Path& path, std::error_code& ec) {
  */
 void NativeFileSystem::DeleteDirectory(const Path& path, std::error_code& ec) {
     ec.clear();
-    fs::remove(ToNativePath(m_root, path), ec);
+    fs::remove(ToNativePath(m_pImpl->m_root, path), ec);
 }
 
 /**
@@ -373,7 +381,7 @@ void NativeFileSystem::DeleteDirectory(const Path& path, std::error_code& ec) {
  */
 void NativeFileSystem::DeleteDirectories(const Path& path, std::error_code& ec) {
     ec.clear();
-    fs::remove_all(ToNativePath(m_root, path), ec);
+    fs::remove_all(ToNativePath(m_pImpl->m_root, path), ec);
 }
 
 /**
@@ -388,7 +396,7 @@ void NativeFileSystem::DeleteDirectories(const Path& path, std::error_code& ec) 
  */
 std::unique_ptr<FileHandle> NativeFileSystem::Open(const Path& path, OpenOption openOptions, std::error_code& ec) {
     ec.clear();
-    auto handle = std::make_unique<NativeFileHandle>(ToNativePath(m_root, path), openOptions, ec);
+    auto handle = std::make_unique<NativeFileHandle>(ToNativePath(m_pImpl->m_root, path), openOptions, ec);
     if (ec) {
         return nullptr;
     }
