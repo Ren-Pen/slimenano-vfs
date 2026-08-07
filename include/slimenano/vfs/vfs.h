@@ -15,5 +15,6 @@
 #include <slimenano/vfs/FileSystem.h>
 #include <slimenano/vfs/NativeFileSystem.h>
 #include <slimenano/vfs/VirtualFileSystem.h>
+#include <slimenano/vfs/ZipFileSystem.h>
 
 #endif
