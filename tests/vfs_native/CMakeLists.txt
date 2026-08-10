@@ -4,7 +4,7 @@ set(TARGET_NAME vfs_native_test)
 set(TARGET ${NAMESPACE}_${TARGET_NAME})
 
 add_executable(${TARGET}
-    "src/NativeFileSystemTest.cpp"
+  "src/NativeFileSystemTest.cpp"
 )
 
 if(MSVC)

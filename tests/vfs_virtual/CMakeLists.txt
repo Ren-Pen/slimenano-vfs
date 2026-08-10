@@ -4,8 +4,8 @@ set(TARGET_NAME vfs_virtual_test)
 set(TARGET ${NAMESPACE}_${TARGET_NAME})
 
 add_executable(${TARGET}
-    "src/MountTest.cpp"
-    "src/OperationTest.cpp"
+  "src/MountTest.cpp"
+  "src/OperationTest.cpp"
 )
 
 if(MSVC)

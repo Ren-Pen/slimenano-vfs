@@ -4,12 +4,12 @@ set(TARGET_NAME vfs_path_test)
 set(TARGET ${NAMESPACE}_${TARGET_NAME})
 
 add_executable(${TARGET}
-    "src/PathBaseTest.cpp"
-    "src/PathIteratorTest.cpp"
-    "src/PathJoinCompareTest.cpp"
-    "src/PathNormalizeTest.cpp"
-    "src/PathParentTest.cpp"
-    "src/PathResolveTest.cpp"
+  "src/PathBaseTest.cpp"
+  "src/PathIteratorTest.cpp"
+  "src/PathJoinCompareTest.cpp"
+  "src/PathNormalizeTest.cpp"
+  "src/PathParentTest.cpp"
+  "src/PathResolveTest.cpp"
 )
 
 target_link_libraries(${TARGET} PRIVATE GTest::gtest)

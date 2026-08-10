@@ -4,7 +4,7 @@ set(TARGET_NAME vfs_zip_test)
 set(TARGET ${NAMESPACE}_${TARGET_NAME})
 
 add_executable(${TARGET}
-    "src/ZipFileSystemTest.cpp"
+  "src/ZipFileSystemTest.cpp"
 )
 
 if(MSVC)

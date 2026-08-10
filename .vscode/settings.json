@@ -1,6 +1,6 @@
 {
     "cmake.copyCompileCommands": "${workspaceFolder}/build/compile_commands.json",
-    "[cpp]": {
+    "[cpp][cmake]": {
         "editor.formatOnSave": true
     }
 }
