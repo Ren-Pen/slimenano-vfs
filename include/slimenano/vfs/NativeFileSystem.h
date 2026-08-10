@@ -30,23 +30,13 @@ public:
      *
      * @param root UTF-8 path of the backing directory on disk.
      */
-    explicit NativeFileSystem(std::string_view root);
+    explicit NativeFileSystem(std::string_view root, std::error_code& ec);
     ~NativeFileSystem();
 
     NativeFileSystem(const NativeFileSystem&) = delete;
     NativeFileSystem(NativeFileSystem&&) = delete;
     NativeFileSystem& operator=(const NativeFileSystem&) = delete;
     NativeFileSystem& operator=(NativeFileSystem&&) = delete;
-
-    /**
-     * @brief Validates that the root directory exists and is a directory.
-     *
-     * Implements FileSystem::Initialize.
-     *
-     * @param ec On failure, set to std::errc::not_a_directory when the root
-     *           is missing or is not a directory.
-     */
-    void Initialize(std::error_code& ec) const override;
 
     /**
      * @brief Returns metadata about the entry at @p path.

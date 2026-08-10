@@ -299,18 +299,6 @@ std::vector<std::shared_ptr<FileSystem>> VirtualFileSystem::GetMountedFileSystem
 }
 
 /**
- * @brief Validates the virtual file system.
- *
- * The virtual file system is always valid, so the error code is simply
- * cleared.
- *
- * @param ec On success, cleared.
- */
-void VirtualFileSystem::Initialize(std::error_code& ec) const {
-    ec.clear();
-}
-
-/**
  * @brief Checks whether an entry exists at @p path.
  *
  * @param path The virtual path to query.

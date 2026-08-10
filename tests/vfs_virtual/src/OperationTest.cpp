@@ -43,7 +43,7 @@ protected:
         fs::create_directories(m_dir / sub, ec);
         const auto u8Root = (m_dir / sub).u8string();
         return std::make_shared<NativeFileSystem>(
-            std::string(reinterpret_cast<const char*>(u8Root.data()), u8Root.size())
+            std::string(reinterpret_cast<const char*>(u8Root.data()), u8Root.size()), ec
         );
     }
 

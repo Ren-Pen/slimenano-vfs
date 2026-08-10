@@ -17,6 +17,7 @@ add_library(${TARGET}
 "src/Virtual/VirtualFileSystem.cpp"
 "src/Native/NativeFileSystem.cpp"
 "src/Native/NativeFileHandle.cpp"
+"src/Native/NativeUtils.cpp"
 )
 
 add_library(${NAMESPACE}::${TARGET_NAME} ALIAS ${TARGET})

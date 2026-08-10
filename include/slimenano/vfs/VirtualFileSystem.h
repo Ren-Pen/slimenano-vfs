@@ -69,16 +69,10 @@ public:
      *         initialization fails.
      */
     template <typename T, typename... Args>
-    std::shared_ptr<FileSystem> CreateAndMount(const Path& mountPoint, std::error_code& ec, Args&&... args) {
+    std::shared_ptr<FileSystem> CreateAndMount(const Path& mountPoint, Args&&... args) {
         static_assert(std::is_base_of_v<FileSystem, T>, "T must derive from FileSystem");
         auto ptr = std::make_shared<T>(std::forward<Args>(args)...);
         if (!ptr) {
-            ec = std::make_error_code(std::errc::not_enough_memory);
-            return nullptr;
-        }
-
-        ptr->Initialize(ec);
-        if (ec) {
             return nullptr;
         }
 
@@ -134,16 +128,6 @@ public:
      *         is mounted there.
      */
     [[nodiscard]] std::vector<std::shared_ptr<FileSystem>> GetMountedFileSystems(const Path& mountPoint) const;
-
-    /**
-     * @brief Validates the virtual file system.
-     *
-     * Implements FileSystem::Initialize. The virtual file system is always
-     * valid, so the error code is simply cleared.
-     *
-     * @param ec On success, cleared.
-     */
-    void Initialize(std::error_code& ec) const override;
 
     /**
      * @brief Checks whether an entry exists at @p path.

@@ -25,8 +25,10 @@ protected:
 
         const auto u8Root = m_dir.u8string();
         m_fs = std::make_unique<NativeFileSystem>(
-            std::string(reinterpret_cast<const char*>(u8Root.data()), u8Root.size())
+            std::string(reinterpret_cast<const char*>(u8Root.data()), u8Root.size()), ec
         );
+
+        ASSERT_FALSE(ec) << ec.message();
     }
 
     void TearDown() override {

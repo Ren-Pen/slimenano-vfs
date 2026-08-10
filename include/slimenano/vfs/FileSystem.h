@@ -42,14 +42,6 @@ public:
     FileSystem& operator=(FileSystem&&) noexcept = delete;
 
     /**
-     * @brief Performs one-time initialization and validates the backing
-     *        store.
-     *
-     * @param ec On failure, set to an error code describing the problem.
-     */
-    virtual void Initialize(std::error_code& ec) const = 0;
-
-    /**
      * @brief Returns metadata about the entry at @p path.
      *
      * @param path The virtual path to query.

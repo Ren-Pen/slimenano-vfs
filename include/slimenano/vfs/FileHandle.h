@@ -82,7 +82,7 @@ public:
      *
      * @return The position in bytes, or zero on failure.
      */
-    virtual std::uint64_t Tell(std::error_code& ec) = 0;
+    [[nodiscard]] virtual std::uint64_t Tell(std::error_code& ec) = 0;
     /**
      * @brief Flushes buffered data to the underlying storage.
      *

@@ -80,18 +80,8 @@ struct NativeFileSystem::Impl {
  *
  * @param root UTF-8 path of the backing directory on disk.
  */
-NativeFileSystem::NativeFileSystem(std::string_view root) : m_pImpl(std::make_unique<Impl>(FromUtf8(root))) {
-}
-
-NativeFileSystem::~NativeFileSystem() = default;
-
-/**
- * @brief Validates that the root directory exists and is a directory.
- *
- * @param ec On failure, set to std::errc::not_a_directory when the root is
- *           missing or is not a directory.
- */
-void NativeFileSystem::Initialize(std::error_code& ec) const {
+NativeFileSystem::NativeFileSystem(std::string_view root, std::error_code& ec) :
+    m_pImpl(std::make_unique<Impl>(FromUtf8(root))) {
     ec.clear();
     auto is_dir = fs::is_directory(m_pImpl->m_root, ec);
     if (ec) {
@@ -101,6 +91,8 @@ void NativeFileSystem::Initialize(std::error_code& ec) const {
         ec = std::make_error_code(std::errc::not_a_directory);
     }
 }
+
+NativeFileSystem::~NativeFileSystem() = default;
 
 /**
  * @brief Returns metadata about the entry at @p path.
@@ -400,7 +392,7 @@ std::unique_ptr<FileHandle> NativeFileSystem::Open(const Path& path, OpenOption 
     ec.clear();
     auto handle = std::make_unique<NativeFileHandle>(ToUtf8(ToNativePath(m_pImpl->m_root, path)), openOptions, ec);
     if (ec) {
-        return nullptr;
+        return {};
     }
     return handle;
 }

@@ -36,7 +36,7 @@ protected:
         fs::create_directories(m_dir / sub, ec);
         const auto u8Root = (m_dir / sub).u8string();
         return std::make_shared<NativeFileSystem>(
-            std::string(reinterpret_cast<const char*>(u8Root.data()), u8Root.size())
+            std::string(reinterpret_cast<const char*>(u8Root.data()), u8Root.size()), ec
         );
     }
 
@@ -170,7 +170,7 @@ TEST_F(VirtualFileSystemMountTest, CreateAndMountSucceeds) {
     const std::string root(reinterpret_cast<const char*>(u8Root.data()), u8Root.size());
 
     std::error_code ec;
-    auto fs = m_vfs->CreateAndMount<NativeFileSystem>("/", ec, root);
+    auto fs = m_vfs->CreateAndMount<NativeFileSystem>("/", root, ec);
     ASSERT_NE(fs, nullptr);
     ASSERT_FALSE(ec) << ec.message();
     EXPECT_TRUE(m_vfs->IsMounted(Path{"/"}, fs));
@@ -182,7 +182,7 @@ TEST_F(VirtualFileSystemMountTest, CreateAndMountFailsWhenInitializeFails) {
     const std::string missingRoot(reinterpret_cast<const char*>(u8Root.data()), u8Root.size());
 
     std::error_code ec;
-    auto fs = m_vfs->CreateAndMount<NativeFileSystem>("/", ec, missingRoot);
+    auto fs = m_vfs->CreateAndMount<NativeFileSystem>("/", missingRoot, ec);
     EXPECT_EQ(fs, nullptr);
     // The exact code is platform-dependent (no_such_file_or_directory vs
     // not_a_directory); the contract is that the failure is reported.

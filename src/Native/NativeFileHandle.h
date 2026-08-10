@@ -28,7 +28,7 @@ class NativeFileHandle final : public FileHandle {
 
 public:
     NativeFileHandle(std::string_view path, OpenOption options, std::error_code& ec);
-    virtual ~NativeFileHandle() = default;
+    virtual ~NativeFileHandle();
 
     std::size_t Read(std::span<std::byte> buffer, std::error_code& ec) override;
 
@@ -36,14 +36,14 @@ public:
 
     std::uint64_t Seek(std::int64_t offset, SeekOrigin origin, std::error_code& ec) override;
 
-    std::uint64_t Tell(std::error_code& ec) override;
+    [[nodiscard]] std::uint64_t Tell(std::error_code& ec) override;
 
     void Flush(std::error_code& ec) override;
 
     void Close(std::error_code& ec) override;
 
 private:
-    FilePtr m_pFile{nullptr};
+    FilePtr m_pFile{};
     bool m_readable{false};
     bool m_writable{false};
 };
