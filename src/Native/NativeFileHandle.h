@@ -3,8 +3,8 @@
  * @brief Declaration of the native file handle implementation.
  */
 
-#ifndef SLIMENANO_VFS_SRC_NATIVE_FILE_HANDLE_H
-#define SLIMENANO_VFS_SRC_NATIVE_FILE_HANDLE_H
+#ifndef SLIMENANO_VFS_SRC_NATIVE_NATIVE_FILE_HANDLE_H
+#define SLIMENANO_VFS_SRC_NATIVE_NATIVE_FILE_HANDLE_H
 
 #include <slimenano/vfs/FileHandle.h>
 #include <slimenano/vfs/Options/OpenOptions.h>
