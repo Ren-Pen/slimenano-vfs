@@ -28,7 +28,7 @@ class NativeFileHandle final : public FileHandle {
 
 public:
     NativeFileHandle(std::string_view path, OpenOption options, std::error_code& ec);
-    virtual ~NativeFileHandle();
+    virtual ~NativeFileHandle() = default;
 
     std::size_t Read(std::span<std::byte> buffer, std::error_code& ec) override;
 
