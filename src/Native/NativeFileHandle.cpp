@@ -5,61 +5,61 @@
 
 #include "NativeFileHandle.h"
 
-#include <limits>
+#if defined(_WIN32)
+#include <Windows.h>
+#endif
 
 namespace slimenano::filesystem {
 
 namespace {
-namespace fs = std::filesystem;
 
-inline void
-doSeek(std::fstream& stream, StreamMode mode, std::ios::off_type offset, std::ios::seekdir dir, std::error_code& ec) {
-    ec.clear();
-    if (mode == StreamMode::None) {
-        ec = std::make_error_code(std::errc::invalid_argument);
-        return;
-    } else if (mode == StreamMode::Read) {
-        stream.seekg(offset, dir);
-    } else {
-        stream.seekp(offset, dir);
+#if defined(_WIN32)
+
+std::wstring Utf8ToWchar(std::string_view str) {
+    if (str.empty()) {
+        return {};
     }
-    if (stream.fail()) {
-        ec = std::make_error_code(std::errc::io_error);
-        stream.clear();
+
+    int size = MultiByteToWideChar(CP_UTF8, 0, str.data(), static_cast<int>(str.size()), nullptr, 0);
+
+    if (size == 0) {
+        return {};
     }
+
+    std::wstring result(static_cast<std::size_t>(size), L'\0');
+
+    MultiByteToWideChar(CP_UTF8, 0, str.data(), static_cast<int>(str.size()), result.data(), size);
+
+    return result;
 }
 
+std::FILE* PortableFOpen(std::string_view path, std::string_view mode) {
+    std::FILE* fp = nullptr;
+    const std::wstring wpath = Utf8ToWchar(path);
+    const std::wstring wmode(mode.begin(), mode.end());
+    const errno_t err = _wfopen_s(&fp, wpath.c_str(), wmode.c_str());
+    if (err != 0) {
+        return nullptr;
+    }
+    return fp;
+}
+
+#define PortableFSeek _fseeki64
+#define PortableFTell _ftelli64
+
+#else
+
+std::FILE* PortableFOpen(std::string_view path, std::string_view mode) {
+    return std::fopen(std::string(path).c_str(), std::string(mode).c_str());
+}
+
+#define PortableFSeek fseeko
+#define PortableFTell ftello
+
+#endif
 } // namespace
 
-void NativeFileHandle::SwitchStreamMode(StreamMode mode, std::error_code& ec) {
-    ec.clear();
-    if (m_curMode == mode) {
-        return;
-    }
-    doSeek(m_stream, mode, m_pos, std::ios::beg, ec);
-    if (ec) {
-        ResetStreamMode();
-        return;
-    }
-    m_curMode = mode;
-}
-
-void NativeFileHandle::ResetStreamMode() {
-    m_curMode = StreamMode::None;
-}
-
-/**
- * @brief Opens the native file.
- *
- * Derives the stream mode from @p options, creates the file first when
- * OpenOption::Create is set and the file does not exist, and reports all
- * failures through @p ec.
- *
- * @param path    Native path of the file to open.
- * @param options Access flags for the file.
- * @param ec      On failure, set to an error code describing the problem.
- */
-NativeFileHandle::NativeFileHandle(std::filesystem::path path, OpenOption options, std::error_code& ec) {
+NativeFileHandle::NativeFileHandle(std::string_view path, OpenOption options, std::error_code& ec) {
 
     m_readable = (options & OpenOption::Read) != OpenOption::None;
     m_writable = (options & (OpenOption::Append | OpenOption::Truncate | OpenOption::Create)) != OpenOption::None;
@@ -72,243 +72,118 @@ NativeFileHandle::NativeFileHandle(std::filesystem::path path, OpenOption option
         return;
     }
 
-    std::error_code existsEc;
-    const bool exists = fs::exists(path, existsEc);
-    if (existsEc) {
-        ec = existsEc;
-        return;
+    bool exists = false;
+    {
+        FilePtr existsFp(PortableFOpen(path, "rb"));
+        if (existsFp) {
+            exists = true;
+        }
     }
     if (!exists && !create) {
         ec = std::make_error_code(std::errc::no_such_file_or_directory);
         return;
     }
 
-    if (!exists) {
-        std::ofstream touch{path, std::ios::out | std::ios::binary};
-        if (!touch) {
-            ec = std::make_error_code(std::errc::io_error);
-            return;
-        }
-    }
-
-    std::ios::openmode mode = std::ios::binary;
-    if (m_readable) {
-        mode |= std::ios::in;
-    }
-    if (m_writable) {
-        mode |= std::ios::out;
-        if (append) {
-            mode |= std::ios::ate;
-        }
-        if (truncate) {
-            mode |= std::ios::trunc;
-        }
-    }
-
-    m_stream.open(path, mode);
-    if (!m_stream.is_open()) {
-        ec = std::make_error_code(std::errc::io_error);
+    std::string mode;
+    if (m_readable && !m_writable) {
+        mode = "rb";
+    } else if (m_writable && !m_readable) {
+        mode = append ? "ab" : (truncate ? "wb" : (exists ? "r+b" : "wb"));
+    } else if (m_writable && m_readable) {
+        mode = append ? "a+b" : (truncate ? "w+b" : (exists ? "r+b" : "w+b"));
+    } else {
+        ec = std::make_error_code(std::errc::invalid_argument);
         return;
     }
 
-    if (append) {
-        const auto pos = m_stream.tellp();
-        if (m_stream.fail() || pos < 0) {
-            m_stream.close();
-            ec = std::make_error_code(std::errc::io_error);
-            return;
-        }
-        m_pos = pos;
+    auto* fp = PortableFOpen(path, mode);
+    if (!fp) {
+        ec = std::make_error_code(std::errc::io_error);
+        return;
     }
+    m_pFile.reset(fp);
 }
 
-/**
- * @brief Reads bytes from the file into @p buffer.
- *
- * @param buffer Destination span for the read data.
- * @param ec     On failure, set to an error code describing the problem.
- *
- * @return The number of bytes read; fewer than requested means end of file
- *         was reached. Returns zero on error.
- */
 std::size_t NativeFileHandle::Read(std::span<std::byte> buffer, std::error_code& ec) {
     ec.clear();
-    if (m_closed || !m_readable) {
+    if (!m_pFile || !m_readable) {
         ec = std::make_error_code(std::errc::bad_file_descriptor);
         return 0;
     }
+
     if (buffer.empty()) {
         return 0;
     }
-    if (buffer.size() > static_cast<std::size_t>(std::numeric_limits<std::streamsize>::max())) {
-        ec = std::make_error_code(std::errc::value_too_large);
-        return 0;
+
+    std::size_t n = std::fread(buffer.data(), sizeof(buffer[0]), buffer.size(), m_pFile.get());
+    if (n < buffer.size()) {
+        if (std::ferror(m_pFile.get())) {
+            ec = std::make_error_code(std::errc::io_error);
+            std::clearerr(m_pFile.get());
+            return 0;
+        }
     }
 
-    SwitchStreamMode(StreamMode::Read, ec);
-    if (ec) {
-        return 0;
-    }
-
-    m_stream.read(reinterpret_cast<char*>(buffer.data()), static_cast<std::streamsize>(buffer.size()));
-
-    const auto state = m_stream.rdstate();
-    if (state & std::ios::badbit) {
-        ec = std::make_error_code(std::errc::io_error);
-        ResetStreamMode();
-        m_stream.clear();
-        return 0;
-    }
-    if (state != std::ios::goodbit) {
-        m_stream.clear();
-    }
-    const auto count = m_stream.gcount();
-    m_pos += count;
-    return static_cast<std::size_t>(count);
+    return n;
 }
 
-/**
- * @brief Writes bytes from @p buffer to the file.
- *
- * @param buffer Source span of the data to write.
- * @param ec     On failure, set to an error code describing the problem.
- *
- * @return The number of bytes written, or zero on failure.
- */
 std::size_t NativeFileHandle::Write(std::span<const std::byte> buffer, std::error_code& ec) {
     ec.clear();
-    if (m_closed || !m_writable) {
+    if (!m_pFile || !m_writable) {
         ec = std::make_error_code(std::errc::bad_file_descriptor);
         return 0;
     }
     if (buffer.empty()) {
         return 0;
     }
-    if (buffer.size() > static_cast<std::size_t>(std::numeric_limits<std::streamsize>::max())) {
-        ec = std::make_error_code(std::errc::value_too_large);
-        return 0;
-    }
 
-    SwitchStreamMode(StreamMode::Write, ec);
-    if (ec) {
-        return 0;
-    }
-
-    m_stream.write(reinterpret_cast<const char*>(buffer.data()), static_cast<std::streamsize>(buffer.size()));
-
-    if (m_stream.fail()) {
+    std::size_t n = fwrite(buffer.data(), sizeof(buffer[0]), buffer.size(), m_pFile.get());
+    if (n < buffer.size()) {
         ec = std::make_error_code(std::errc::io_error);
-        ResetStreamMode();
-        m_stream.clear();
-        return 0;
+        std::clearerr(m_pFile.get());
     }
-    const auto count = buffer.size();
-    m_pos += static_cast<std::ios::off_type>(count);
-    return count;
+    return n;
 }
 
-/**
- * @brief Moves the file position relative to @p origin.
- *
- * When the handle is both readable and writable, both stream positions are
- * moved.
- *
- * @param offset Byte offset relative to @p origin; may be negative.
- * @param origin Anchor point for the offset.
- * @param ec     On failure, set to an error code describing the problem.
- *
- * @return The new position in bytes, or zero on failure.
- */
 std::uint64_t NativeFileHandle::Seek(std::int64_t offset, SeekOrigin origin, std::error_code& ec) {
     ec.clear();
-    if (m_closed || (!m_readable && !m_writable)) {
+    if (!m_pFile) {
         ec = std::make_error_code(std::errc::bad_file_descriptor);
         return 0;
     }
 
-    StreamMode mode = m_curMode;
+    int whence;
+    switch (origin) {
 
-    if (mode == StreamMode::None) {
-        if (m_readable) {
-            mode = StreamMode::Read;
-        } else if (m_writable) {
-            mode = StreamMode::Write;
-        }
+    case SeekOrigin::Begin:
+        whence = SEEK_SET;
+        break;
+    case SeekOrigin::Current:
+        whence = SEEK_CUR;
+        break;
+    case SeekOrigin::End:
+        whence = SEEK_END;
+        break;
+    default:
+        ec = std::make_error_code(std::errc::invalid_argument);
+        return 0;
     }
 
-    if (origin == SeekOrigin::Begin) {
-        if (offset < 0) {
-            ec = std::make_error_code(std::errc::invalid_seek);
-            return 0;
-        }
-        doSeek(m_stream, mode, offset, std::ios::beg, ec);
-        if (ec) {
-            ResetStreamMode();
-            return 0;
-        }
-        m_pos = static_cast<std::ios::off_type>(offset);
-    } else {
-
-        decltype(m_pos) newOffset = static_cast<decltype(m_pos)>(offset);
-        const auto dir = origin == SeekOrigin::End ? std::ios::end : std::ios::beg;
-
-        if (origin == SeekOrigin::Current) {
-            if (offset > 0 && m_pos > std::numeric_limits<decltype(m_pos)>::max() - offset) {
-                ec = std::make_error_code(std::errc::value_too_large);
-                return 0;
-            }
-            if (offset < 0 && m_pos < std::numeric_limits<decltype(m_pos)>::min() - offset) {
-                ec = std::make_error_code(std::errc::value_too_large);
-                return 0;
-            }
-
-            newOffset += m_pos;
-            if (newOffset < 0) {
-                ec = std::make_error_code(std::errc::invalid_seek);
-                return 0;
-            }
-        }
-
-        doSeek(m_stream, mode, newOffset, dir, ec);
-        if (ec) {
-            ResetStreamMode();
-            return 0;
-        }
-
-        decltype(m_pos) newPos{0};
-        if (mode == StreamMode::Read) {
-            newPos = m_stream.tellg();
-        } else {
-            newPos = m_stream.tellp();
-        }
-        if (m_stream.fail() || newPos < 0) {
-            ec = std::make_error_code(std::errc::io_error);
-            ResetStreamMode();
-            m_stream.clear();
-            return 0;
-        }
-        m_pos = newPos;
+    if (PortableFSeek(m_pFile.get(), offset, whence) != 0) {
+        ec = std::make_error_code(std::errc::io_error);
+        return 0;
     }
 
-    m_curMode = mode;
-
-    return m_pos;
+    return Tell(ec);
 }
 
-/**
- * @brief Returns the current file position.
- *
- * @param ec On failure, set to an error code describing the problem.
- *
- * @return The position in bytes, or zero on failure.
- */
 std::uint64_t NativeFileHandle::Tell(std::error_code& ec) {
     ec.clear();
-    if (m_closed) {
+    if (!m_pFile) {
         ec = std::make_error_code(std::errc::bad_file_descriptor);
         return 0;
     }
-    const auto pos = m_writable ? m_stream.tellp() : m_stream.tellg();
+    const auto pos = PortableFTell(m_pFile.get());
     if (pos < 0) {
         ec = std::make_error_code(std::errc::io_error);
         return 0;
@@ -316,41 +191,26 @@ std::uint64_t NativeFileHandle::Tell(std::error_code& ec) {
     return static_cast<std::uint64_t>(pos);
 }
 
-/**
- * @brief Flushes buffered data to the underlying storage.
- *
- * @param ec On failure, set to an error code describing the problem.
- */
 void NativeFileHandle::Flush(std::error_code& ec) {
     ec.clear();
-    if (m_closed) {
+    if (!m_pFile) {
         ec = std::make_error_code(std::errc::bad_file_descriptor);
         return;
     }
-    m_stream.flush();
-    if (m_stream.fail()) {
-        m_stream.clear();
+    if (fflush(m_pFile.get())) {
         ec = std::make_error_code(std::errc::io_error);
     }
 }
 
-/**
- * @brief Closes the file.
- *
- * Subsequent operations on the handle fail with
- * std::errc::bad_file_descriptor. Closing an already closed handle is a
- * no-op.
- *
- * @param ec On failure, set to an error code describing the problem.
- */
 void NativeFileHandle::Close(std::error_code& ec) {
     ec.clear();
-    if (m_closed) {
+    if (!m_pFile) {
         return;
     }
-    m_stream.close();
-    m_closed = true;
-    if (m_stream.fail()) {
+
+    auto* fp = m_pFile.release();
+
+    if (fclose(fp)) {
         ec = std::make_error_code(std::errc::io_error);
     }
 }

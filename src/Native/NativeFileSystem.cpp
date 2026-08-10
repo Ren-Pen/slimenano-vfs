@@ -396,7 +396,7 @@ void NativeFileSystem::DeleteDirectories(const Path& path, std::error_code& ec) 
  */
 std::unique_ptr<FileHandle> NativeFileSystem::Open(const Path& path, OpenOption openOptions, std::error_code& ec) {
     ec.clear();
-    auto handle = std::make_unique<NativeFileHandle>(ToNativePath(m_pImpl->m_root, path), openOptions, ec);
+    auto handle = std::make_unique<NativeFileHandle>(ToUtf8(ToNativePath(m_pImpl->m_root, path)), openOptions, ec);
     if (ec) {
         return nullptr;
     }
