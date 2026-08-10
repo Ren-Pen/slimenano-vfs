@@ -83,6 +83,8 @@ struct NativeFileSystem::Impl {
 NativeFileSystem::NativeFileSystem(std::string_view root) : m_pImpl(std::make_unique<Impl>(FromUtf8(root))) {
 }
 
+NativeFileSystem::~NativeFileSystem() = default;
+
 /**
  * @brief Validates that the root directory exists and is a directory.
  *

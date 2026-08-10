@@ -31,7 +31,7 @@ public:
      * @param root UTF-8 path of the backing directory on disk.
      */
     explicit NativeFileSystem(std::string_view root);
-    ~NativeFileSystem() = default;
+    ~NativeFileSystem();
 
     NativeFileSystem(const NativeFileSystem&) = delete;
     NativeFileSystem(NativeFileSystem&&) = delete;
