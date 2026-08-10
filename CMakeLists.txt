@@ -1,26 +1,25 @@
 cmake_minimum_required(VERSION 3.21)
 project(SlimenanoVirtualFileSystem
-    VERSION 0.0.1
-    DESCRIPTION "This is a free virtual file system"
-    HOMEPAGE_URL "https://github.com/Ren-Pen/slimenano-vfs"
-    LANGUAGES CXX
+  VERSION 0.0.1
+  DESCRIPTION "This is a free virtual file system"
+  HOMEPAGE_URL "https://github.com/Ren-Pen/slimenano-vfs"
+  LANGUAGES CXX
 )
-
 
 set(NAMESPACE slimenano)
 set(TARGET_NAME vfs)
 set(TARGET ${NAMESPACE}_${TARGET_NAME})
 
 add_library(${TARGET}
-"src/pch.cpp"
-"src/Path.cpp"
-"src/Virtual/VirtualFileSystem.cpp"
-"src/Native/NativeFileSystem.cpp"
-"src/Native/NativeFileHandle.cpp"
-"src/Native/NativeUtils.cpp"
-"src/Zip/ZipFileSystem.cpp"
-"src/Zip/ZipErrorCategory.cpp"
-"src/Zip/ZipFileHandle.cpp"
+  "src/pch.cpp"
+  "src/Path.cpp"
+  "src/Virtual/VirtualFileSystem.cpp"
+  "src/Native/NativeFileSystem.cpp"
+  "src/Native/NativeFileHandle.cpp"
+  "src/Native/NativeUtils.cpp"
+  "src/Zip/ZipFileSystem.cpp"
+  "src/Zip/ZipErrorCategory.cpp"
+  "src/Zip/ZipFileHandle.cpp"
 )
 
 add_library(${NAMESPACE}::${TARGET_NAME} ALIAS ${TARGET})
@@ -48,13 +47,19 @@ find_package(libzip CONFIG REQUIRED)
 target_link_libraries(${TARGET} PRIVATE libzip::zip)
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
-    option(SLIMENANO_VFS_BUILD_TESTS "Build VFS tests" ON)
+  option(SLIMENANO_VFS_BUILD_TESTS "Build VFS tests" ON)
 else()
-    option(SLIMENANO_VFS_BUILD_TESTS "Build VFS tests" OFF)
+  option(SLIMENANO_VFS_BUILD_TESTS "Build VFS tests" OFF)
 endif()
 
 if(SLIMENANO_VFS_BUILD_TESTS)
-    enable_testing()
-    find_package(GTest CONFIG REQUIRED)
-    add_subdirectory(tests)
+  enable_testing()
+  find_package(GTest CONFIG REQUIRED)
+  add_subdirectory(tests)
+endif()
+
+option(SLIMENANO_VFS_BUILD_DEMO "Build VFS demo" ON)
+
+if(SLIMENANO_VFS_BUILD_DEMO)
+  add_subdirectory(demo)
 endif()
