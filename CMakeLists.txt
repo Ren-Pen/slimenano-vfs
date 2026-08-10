@@ -18,6 +18,9 @@ add_library(${TARGET}
 "src/Native/NativeFileSystem.cpp"
 "src/Native/NativeFileHandle.cpp"
 "src/Native/NativeUtils.cpp"
+"src/Zip/ZipFileSystem.cpp"
+"src/Zip/ZipErrorCategory.cpp"
+"src/Zip/ZipFileHandle.cpp"
 )
 
 add_library(${NAMESPACE}::${TARGET_NAME} ALIAS ${TARGET})

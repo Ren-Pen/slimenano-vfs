@@ -7,15 +7,13 @@ namespace slimenano::filesystem {
 
 class ZipFileSystem final : public FileSystem {
 public:
-    explicit ZipFileSystem(std::string_view zip_path);
-    ~ZipFileSystem() = default;
+    explicit ZipFileSystem(std::string_view zip_path, std::error_code& ec);
+    ~ZipFileSystem();
 
     ZipFileSystem(const ZipFileSystem&) = delete;
     ZipFileSystem(ZipFileSystem&&) = delete;
     ZipFileSystem& operator=(const ZipFileSystem&) = delete;
     ZipFileSystem& operator=(ZipFileSystem&&) = delete;
-
-    void Initialize(std::error_code& ec) const override;
 
     [[nodiscard]] FileInfo Stat(const Path& path, std::error_code& ec) const override;
 
@@ -51,6 +49,8 @@ public:
     using FileSystem::Open;
 
 private:
+    struct Impl;
+    std::unique_ptr<Impl> m_pImpl;
 };
 
 } // namespace slimenano::filesystem
