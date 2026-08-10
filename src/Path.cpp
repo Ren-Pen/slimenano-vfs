@@ -99,6 +99,11 @@ std::string normalize(std::string_view path) {
 Path::Path(std::string_view path) : m_path(normalize(path)) {
 }
 
+const Path& Path::Root() {
+    static const Path kRoot{"/"};
+    return kRoot;
+}
+
 /**
  * @brief Returns the normalized path string.
  *

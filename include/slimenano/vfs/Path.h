@@ -55,6 +55,8 @@ public:
     /** @brief Constructs a path from a null-terminated UTF-8 string. */
     Path(const char* path) : Path(std::string_view(path)) {}
 
+    static const Path& Root();
+
     /**
      * @brief Returns the normalized path as a UTF-8 string view.
      *

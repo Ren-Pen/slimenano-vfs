@@ -5,11 +5,11 @@
 
 #include <slimenano/vfs/VirtualFileSystem.h>
 
-#include <functional>
-#include <map>
 #include <optional>
 #include <set>
 #include <chrono>
+
+#include <slimenano/vfs/VirtualPathTree.h>
 
 namespace slimenano::filesystem {
 
@@ -17,10 +17,6 @@ namespace {
 
 namespace chrono = std::chrono;
 
-/**
- * @brief Root of the virtual tree.
- */
-const Path kRoot{"/"};
 } // namespace
 
 /**
@@ -28,85 +24,16 @@ const Path kRoot{"/"};
  */
 struct VirtualFileSystem::Impl {
 
-    /**
-     * @brief A node in the virtual directory tree.
-     */
-    struct Node {
-
-        /**
-         * @brief Constructs a node under a parent.
-         *
-         * @param parent Parent node; nullptr for the root.
-         * @param path   Name of this node within the parent.
-         */
-        Node(const std::shared_ptr<Node>& parent, std::string_view path) :
-            parent(parent), absolutePath(parent ? parent->absolutePath / path : path),
-            creationTime(
-                chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count()
-            ) {};
-        /** @brief Parent node; empty for the root. */
-        std::weak_ptr<Node> parent;
-        /** @brief Absolute virtual path of this node. */
-        Path absolutePath;
+    struct MountInfo {
         /** @brief Creation time, in milliseconds since the Unix epoch. */
-        std::int64_t creationTime;
+        std::int64_t creationTime{
+            chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count()
+        };
         /** @brief File systems mounted at this node, in mounting order. */
         std::vector<std::shared_ptr<FileSystem>> fileSystems{};
-        /** @brief Child nodes, keyed by segment name. */
-        std::map<std::string, std::shared_ptr<Node>, std::less<>> children{};
     };
 
-    std::shared_ptr<Node> root = std::make_shared<Node>(nullptr, "/");
-
-    /**
-     * @brief Looks up the node for a virtual path.
-     *
-     * @param path Virtual path to look up.
-     *
-     * @return The node, or nullptr when the path does not exist in the tree.
-     */
-    std::shared_ptr<Node> findNode(const Path& path) const {
-        Path absolutePath = path.ToAbsolute(kRoot);
-        auto node = root;
-
-        for (auto segment : absolutePath) {
-            if (segment == "/") {
-                continue;
-            }
-            auto it = node->children.find(segment);
-            if (it == node->children.end()) {
-                return {};
-            }
-            node = it->second;
-        }
-
-        return node;
-    }
-
-    /**
-     * @brief Removes empty nodes from the tree, bottom-up.
-     *
-     * A node with no children and no mounted file systems is detached from
-     * its parent, and the parent is then cleaned up recursively.
-     *
-     * @param ptr The node to clean up.
-     */
-    void cleanupNode(const std::shared_ptr<Node>& ptr) {
-        if (!ptr->fileSystems.empty() || !ptr->children.empty()) {
-            return;
-        }
-        auto parent = ptr->parent.lock();
-        if (!parent) {
-            return;
-        }
-
-        std::erase_if(parent->children, [&](const auto& kv) {
-            return kv.second == ptr;
-        });
-        ptr->parent = {};
-
-        cleanupNode(parent);
-    }
+    VirtualPathTree<MountInfo> mountTree{};
 
     /**
      * @brief Result of resolving a virtual path.
@@ -125,54 +52,18 @@ struct VirtualFileSystem::Impl {
         std::int64_t creationTime;
     };
 
-    /**
-     * @brief Walks the tree to the node nearest a path.
-     *
-     * @param absolutePath The absolute path to walk.
-     *
-     * @return The nearest existing node and whether the full path was found
-     *         exactly.
-     */
-    std::pair<std::shared_ptr<Node>, bool> ResolveNode(const Path& absolutePath) const {
-        auto node = root;
-        bool exact = true;
-        for (auto segment : absolutePath) {
-            if (segment == "/") {
-                continue;
-            }
-            auto it = node->children.find(segment);
-            if (it == node->children.end()) {
-                exact = false;
-                break;
-            }
-            node = it->second;
-        }
-
-        return {node, exact};
-    }
-
-    /**
-     * @brief Resolves a path to its owning file system.
-     *
-     * Returns the file system mounted at the deepest ancestor node that has
-     * one; a null file system is returned for pure virtual directories.
-     *
-     * @param path Virtual path to resolve.
-     *
-     * @return The resolved owner, or std::nullopt when no node exists.
-     */
     std::optional<VirtualFileNode> Resolve(const Path& path) const {
-        auto absolutePath = path.ToAbsolute(kRoot);
-        auto [node, exact] = ResolveNode(absolutePath);
+        auto absolutePath = path.ToAbsolute(Path::Root());
+        auto [node, exact] = mountTree.ResolveNode(absolutePath);
 
-        if (exact && node->fileSystems.empty()) {
-            return VirtualFileNode{nullptr, absolutePath, node->creationTime};
+        if (exact && node->data.fileSystems.empty()) {
+            return VirtualFileNode{nullptr, absolutePath, node->data.creationTime};
         }
 
         while (node) {
-            if (!node->fileSystems.empty()) {
+            if (!node->data.fileSystems.empty()) {
                 return VirtualFileNode{
-                    node->fileSystems.back(), absolutePath.ToRelative(node->absolutePath), node->creationTime
+                    node->data.fileSystems.back(), absolutePath.ToRelative(node->absolutePath), node->data.creationTime
                 };
             }
             node = node->parent.lock();
@@ -193,21 +84,21 @@ struct VirtualFileSystem::Impl {
      */
     std::optional<VirtualFileNode> ResolveIfExist(const Path& path, std::error_code& ec) const {
         ec.clear();
-        auto absolutePath = path.ToAbsolute(kRoot);
-        auto [node, exact] = ResolveNode(absolutePath);
+        auto absolutePath = path.ToAbsolute(Path::Root());
+        auto [node, exact] = mountTree.ResolveNode(absolutePath);
 
-        if (exact && node->fileSystems.empty()) {
-            return VirtualFileNode{nullptr, absolutePath, node->creationTime};
+        if (exact && node->data.fileSystems.empty()) {
+            return VirtualFileNode{nullptr, absolutePath, node->data.creationTime};
         }
 
         while (node) {
-            if (!node->fileSystems.empty()) {
+            if (!node->data.fileSystems.empty()) {
                 auto rel = absolutePath.ToRelative(node->absolutePath);
-                for (auto it = node->fileSystems.rbegin(); it != node->fileSystems.rend(); ++it) {
+                for (auto it = node->data.fileSystems.rbegin(); it != node->data.fileSystems.rend(); ++it) {
                     std::error_code fsEc;
                     if ((*it)->Exists(rel, fsEc)) {
                         ec.clear();
-                        return VirtualFileNode{*it, rel, node->creationTime};
+                        return VirtualFileNode{*it, rel, node->data.creationTime};
                     }
                     if (!ec && fsEc) {
                         ec = fsEc;
@@ -261,8 +152,8 @@ struct VirtualFileSystem::Impl {
         ec.clear();
         std::set<std::string> names;
 
-        auto absolutePath = path.ToAbsolute(kRoot);
-        auto [node, exact] = ResolveNode(absolutePath);
+        auto absolutePath = path.ToAbsolute(Path::Root());
+        auto [node, exact] = mountTree.ResolveNode(absolutePath);
 
         if (exact) {
             for (const auto& [name, child] : node->children) {
@@ -271,9 +162,9 @@ struct VirtualFileSystem::Impl {
         }
 
         while (node) {
-            if (!node->fileSystems.empty()) {
+            if (!node->data.fileSystems.empty()) {
                 auto rel = absolutePath.ToRelative(node->absolutePath);
-                for (auto it = node->fileSystems.rbegin(); it != node->fileSystems.rend(); ++it) {
+                for (auto it = node->data.fileSystems.rbegin(); it != node->data.fileSystems.rend(); ++it) {
                     std::error_code fsEc;
                     const auto& fs = *it;
                     if (fs->IsDirectory(rel, fsEc)) {
@@ -318,23 +209,10 @@ void VirtualFileSystem::Mount(const Path& mountPoint, std::shared_ptr<FileSystem
         return;
     }
 
-    Path absoluteMountPoint = mountPoint.ToAbsolute(kRoot);
+    auto node = m_impl->mountTree.CreateNodeIfAbsent(mountPoint);
 
-    auto node = m_impl->root;
-
-    for (auto segment : absoluteMountPoint) {
-        if (segment == "/") {
-            continue;
-        }
-        auto it = node->children.find(segment);
-        if (it == node->children.end()) {
-            it = node->children.try_emplace(std::string{segment}, std::make_shared<Impl::Node>(node, segment)).first;
-        }
-        node = it->second;
-    }
-
-    if (std::ranges::find(node->fileSystems, ptr) == node->fileSystems.end()) {
-        node->fileSystems.emplace_back(std::move(ptr));
+    if (std::ranges::find(node->data.fileSystems, ptr) == node->data.fileSystems.end()) {
+        node->data.fileSystems.emplace_back(std::move(ptr));
     }
 }
 
@@ -347,11 +225,11 @@ void VirtualFileSystem::Mount(const Path& mountPoint, std::shared_ptr<FileSystem
  * @return true when at least one file system is mounted there.
  */
 bool VirtualFileSystem::IsMounted(const Path& mountPoint) const {
-    auto node = m_impl->findNode(mountPoint);
+    auto node = m_impl->mountTree.FindNode(mountPoint);
     if (!node) {
         return false;
     }
-    return !node->fileSystems.empty();
+    return !node->data.fileSystems.empty();
 }
 
 /**
@@ -364,11 +242,11 @@ bool VirtualFileSystem::IsMounted(const Path& mountPoint) const {
  * @return true when @p ptr is mounted at @p mountPoint.
  */
 bool VirtualFileSystem::IsMounted(const Path& mountPoint, const std::shared_ptr<FileSystem>& ptr) const {
-    auto node = m_impl->findNode(mountPoint);
+    auto node = m_impl->mountTree.FindNode(mountPoint);
     if (!node) {
         return false;
     }
-    return std::ranges::find(node->fileSystems, ptr) != node->fileSystems.end();
+    return std::ranges::find(node->data.fileSystems, ptr) != node->data.fileSystems.end();
 }
 
 /**
@@ -377,12 +255,14 @@ bool VirtualFileSystem::IsMounted(const Path& mountPoint, const std::shared_ptr<
  * @param mountPoint The virtual directory to unmount.
  */
 void VirtualFileSystem::Unmount(const Path& mountPoint) {
-    auto node = m_impl->findNode(mountPoint);
+    auto node = m_impl->mountTree.FindNode(mountPoint);
     if (!node) {
         return;
     }
-    node->fileSystems.clear();
-    m_impl->cleanupNode(node);
+    node->data.fileSystems.clear();
+    m_impl->mountTree.CleanupNode(node, [](auto& data) {
+        return data.fileSystems.empty();
+    });
 }
 
 /**
@@ -392,12 +272,14 @@ void VirtualFileSystem::Unmount(const Path& mountPoint) {
  * @param ptr        The file system instance to detach.
  */
 void VirtualFileSystem::Unmount(const Path& mountPoint, const std::shared_ptr<FileSystem>& ptr) {
-    auto node = m_impl->findNode(mountPoint);
+    auto node = m_impl->mountTree.FindNode(mountPoint);
     if (!node) {
         return;
     }
-    std::erase(node->fileSystems, ptr);
-    m_impl->cleanupNode(node);
+    std::erase(node->data.fileSystems, ptr);
+    m_impl->mountTree.CleanupNode(node, [](auto& data) {
+        return data.fileSystems.empty();
+    });
 }
 
 /**
@@ -409,11 +291,11 @@ void VirtualFileSystem::Unmount(const Path& mountPoint, const std::shared_ptr<Fi
  *         mounted there.
  */
 std::vector<std::shared_ptr<FileSystem>> VirtualFileSystem::GetMountedFileSystems(const Path& mountPoint) const {
-    auto node = m_impl->findNode(mountPoint);
+    auto node = m_impl->mountTree.FindNode(mountPoint);
     if (!node) {
         return {};
     }
-    return node->fileSystems;
+    return node->data.fileSystems;
 }
 
 /**
