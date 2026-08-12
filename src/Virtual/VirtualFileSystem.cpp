@@ -523,6 +523,32 @@ void VirtualFileSystem::DeleteDirectories(const Path& path, std::error_code& ec)
     }
 }
 
+void VirtualFileSystem::Copy(const Path& src, const Path& to, CopyOption copyOptions, std::error_code& ec) {
+    auto fromNode = m_impl->ResolveIfExist(src, ec);
+    if (!fromNode) {
+        return;
+    }
+
+    auto toNode = m_impl->ResolveForWrite(to, ec);
+    if (!toNode) {
+        return;
+    }
+
+    if (!toNode->fs) {
+        ec = std::make_error_code(std::errc::read_only_file_system);
+        return;
+    }
+
+    if (toNode->fs == fromNode->fs) {
+        fromNode->fs->Copy(fromNode->path, toNode->path, copyOptions, ec);
+        return;
+    }
+}
+
+void VirtualFileSystem::Rename(const Path& src, const Path& to, std::error_code& ec) {
+
+};
+
 /**
  * @brief Opens the file at @p path and returns a handle to it.
  *

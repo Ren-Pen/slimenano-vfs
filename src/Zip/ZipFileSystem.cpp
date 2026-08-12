@@ -212,6 +212,14 @@ void ZipFileSystem::DeleteDirectories(const Path&, std::error_code& ec) {
     ec = std::make_error_code(std::errc::read_only_file_system);
 }
 
+void ZipFileSystem::Copy(const Path&, const Path&, CopyOption, std::error_code& ec) {
+    ec = std::make_error_code(std::errc::read_only_file_system);
+}
+
+void ZipFileSystem::Rename(const Path&, const Path&, std::error_code& ec) {
+    ec = std::make_error_code(std::errc::read_only_file_system);
+}
+
 std::unique_ptr<FileHandle> ZipFileSystem::Open(const Path& path, OpenOption openOptions, std::error_code& ec) {
     ec.clear();
     if (!m_pImpl->pZip) {

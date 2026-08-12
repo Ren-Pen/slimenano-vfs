@@ -15,6 +15,7 @@
 #include <slimenano/vfs/Path.h>
 #include <slimenano/vfs/FileInfo.h>
 #include <slimenano/vfs/FileHandle.h>
+#include <slimenano/vfs/Options/CopyOptions.h>
 #include <slimenano/vfs/Options/OpenOptions.h>
 
 namespace slimenano::filesystem {
@@ -184,6 +185,10 @@ public:
      * @param ec   On failure, set to an error code describing the problem.
      */
     virtual void DeleteDirectories(const Path& path, std::error_code& ec) = 0;
+
+    virtual void Copy(const Path& src, const Path& to, CopyOption copyOptions, std::error_code& ec) = 0;
+
+    virtual void Rename(const Path& src, const Path& to, std::error_code& ec) = 0;
 
     /**
      * @brief Opens the file at @p path and returns a handle to it.

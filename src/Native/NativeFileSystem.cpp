@@ -378,6 +378,36 @@ void NativeFileSystem::DeleteDirectories(const Path& path, std::error_code& ec) 
     fs::remove_all(ToNativePath(m_pImpl->m_root, path), ec);
 }
 
+void NativeFileSystem::Copy(const Path& src, const Path& to, CopyOption copyOptions, std::error_code& ec) {
+    ec.clear();
+    auto srcPath = ToNativePath(m_pImpl->m_root, src);
+    auto toPath = ToNativePath(m_pImpl->m_root, to);
+    fs::copy_options fsOpts = fs::copy_options::none;
+    if ((copyOptions & CopyOption::Recursive) != CopyOption::None) {
+        fsOpts |= fs::copy_options::recursive;
+    }
+    if ((copyOptions & CopyOption::OverwriteExisting) != CopyOption::None) {
+        fsOpts |= fs::copy_options::overwrite_existing;
+    }
+    if ((copyOptions & CopyOption::SkipExisting) != CopyOption::None) {
+        fsOpts |= fs::copy_options::skip_existing;
+    }
+    if ((copyOptions & CopyOption::UpdateExisting) != CopyOption::None) {
+        fsOpts |= fs::copy_options::update_existing;
+    }
+    if ((copyOptions & CopyOption::DirectoriesOnly) != CopyOption::None) {
+        fsOpts |= fs::copy_options::directories_only;
+    }
+    fs::copy(srcPath, toPath, fsOpts, ec);
+}
+
+void NativeFileSystem::Rename(const Path& src, const Path& to, std::error_code& ec) {
+    ec.clear();
+    auto srcPath = ToNativePath(m_pImpl->m_root, src);
+    auto toPath = ToNativePath(m_pImpl->m_root, to);
+    fs::rename(srcPath, toPath, ec);
+}
+
 /**
  * @brief Opens the file at @p path and returns a handle to it.
  *
