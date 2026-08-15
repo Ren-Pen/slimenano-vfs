@@ -545,7 +545,7 @@ void VirtualFileSystem::Copy(const Path& src, const Path& to, CopyOption copyOpt
     }
 }
 
-void VirtualFileSystem::Rename(const Path& src, const Path& to, std::error_code& ec) {
+void VirtualFileSystem::Rename(const Path&, const Path&, std::error_code&) {
 
 };
 

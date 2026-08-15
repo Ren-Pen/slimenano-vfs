@@ -69,11 +69,17 @@ public:
      *         initialization fails.
      */
     template <typename T, typename... Args>
-    std::shared_ptr<FileSystem> CreateAndMount(const Path& mountPoint, Args&&... args) {
+    std::shared_ptr<FileSystem> CreateAndMount(std::error_code& ec, const Path& mountPoint, Args&&... args) {
+        ec.clear();
         static_assert(std::is_base_of_v<FileSystem, T>, "T must derive from FileSystem");
-        auto ptr = std::make_shared<T>(std::forward<Args>(args)...);
-        if (!ptr) {
-            return nullptr;
+        std::shared_ptr<T> ptr;
+        if constexpr (std::is_constructible_v<T, Args..., std::error_code&>) {
+            ptr = std::make_shared<T>(std::forward<Args>(args)..., ec);
+            if (ec) {
+                return nullptr;
+            }
+        } else {
+            ptr = std::make_shared<T>(std::forward<Args>(args)...);
         }
 
         Mount(mountPoint, ptr);
