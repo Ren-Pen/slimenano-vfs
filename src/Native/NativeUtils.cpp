@@ -45,4 +45,22 @@ std::FILE* PortableFOpen(std::string_view path, std::string_view mode) {
 
 #endif
 
+std::filesystem::path ToNativePath(const std::filesystem::path& root, const Path& path) {
+    const auto absolutePath = path.ToAbsolute("/");
+    const auto rel = absolutePath.String().substr(1);
+    return root / Utf8ToNativePath(rel);
+}
+
+std::filesystem::path Utf8ToNativePath(std::string_view utf8) {
+    if (utf8.empty()) {
+        return {};
+    }
+    return std::filesystem::path(std::u8string_view(reinterpret_cast<const char8_t*>(utf8.data()), utf8.size()));
+}
+
+std::string NativePathToUtf8(const std::filesystem::path& native) {
+    const auto utf8 = native.u8string();
+    return std::string(reinterpret_cast<const char*>(utf8.data()), utf8.size());
+}
+
 } // namespace slimenano::filesystem

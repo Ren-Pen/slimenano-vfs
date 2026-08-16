@@ -6,7 +6,10 @@
 
 #include "ZipErrorCategory.h"
 #include "ZipFileHandle.h"
+
+#if defined(_WIN32)
 #include "../Native/NativeUtils.h"
+#endif
 
 namespace slimenano::filesystem {
 
@@ -200,15 +203,11 @@ void ZipFileSystem::CreateDirectories(const Path&, std::error_code& ec) {
     ec = std::make_error_code(std::errc::read_only_file_system);
 }
 
-void ZipFileSystem::DeleteFile(const Path&, std::error_code& ec) {
+void ZipFileSystem::Delete(const Path&, std::error_code& ec) {
     ec = std::make_error_code(std::errc::read_only_file_system);
 }
 
-void ZipFileSystem::DeleteDirectory(const Path&, std::error_code& ec) {
-    ec = std::make_error_code(std::errc::read_only_file_system);
-}
-
-void ZipFileSystem::DeleteDirectories(const Path&, std::error_code& ec) {
+void ZipFileSystem::DeleteAll(const Path&, std::error_code& ec) {
     ec = std::make_error_code(std::errc::read_only_file_system);
 }
 
