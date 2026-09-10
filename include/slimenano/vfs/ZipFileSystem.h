@@ -43,10 +43,6 @@ public:
 
     void DeleteDirectories(const Path& path, std::error_code& ec) override;
 
-    void Copy(const Path& src, const Path& to, CopyOption copyOptions, std::error_code& ec) override;
-
-    void Rename(const Path& src, const Path& to, std::error_code& ec) override;
-
     [[nodiscard]] std::unique_ptr<FileHandle>
     Open(const Path& path, OpenOption openOptions, std::error_code& ec) override;
 

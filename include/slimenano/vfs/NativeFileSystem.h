@@ -206,10 +206,6 @@ public:
      */
     void DeleteDirectories(const Path& path, std::error_code& ec) override;
 
-    void Copy(const Path& src, const Path& to, CopyOption copyOptions, std::error_code& ec) override;
-
-    void Rename(const Path& src, const Path& to, std::error_code& ec) override;
-
     /**
      * @brief Opens the file at @p path and returns a handle to it.
      *
