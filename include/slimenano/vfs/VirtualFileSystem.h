@@ -69,11 +69,17 @@ public:
      *         initialization fails.
      */
     template <typename T, typename... Args>
-    std::shared_ptr<FileSystem> CreateAndMount(const Path& mountPoint, Args&&... args) {
+    std::shared_ptr<FileSystem> CreateAndMount(std::error_code& ec, const Path& mountPoint, Args&&... args) {
+        ec.clear();
         static_assert(std::is_base_of_v<FileSystem, T>, "T must derive from FileSystem");
-        auto ptr = std::make_shared<T>(std::forward<Args>(args)...);
-        if (!ptr) {
-            return nullptr;
+        std::shared_ptr<T> ptr;
+        if constexpr (std::is_constructible_v<T, Args..., std::error_code&>) {
+            ptr = std::make_shared<T>(std::forward<Args>(args)..., ec);
+            if (ec) {
+                return nullptr;
+            }
+        } else {
+            ptr = std::make_shared<T>(std::forward<Args>(args)...);
         }
 
         Mount(mountPoint, ptr);
@@ -271,17 +277,7 @@ public:
      * @param path The virtual path of the file to delete.
      * @param ec   On failure, set to an error code describing the problem.
      */
-    void DeleteFile(const Path& path, std::error_code& ec) override;
-
-    /**
-     * @brief Deletes the empty directory at @p path.
-     *
-     * Implements FileSystem::DeleteDirectory.
-     *
-     * @param path The virtual path of the directory to delete.
-     * @param ec   On failure, set to an error code describing the problem.
-     */
-    void DeleteDirectory(const Path& path, std::error_code& ec) override;
+    void Delete(const Path& path, std::error_code& ec) override;
 
     /**
      * @brief Recursively deletes the directory at @p path and everything it
@@ -292,7 +288,7 @@ public:
      * @param path The virtual path of the directory to delete.
      * @param ec   On failure, set to an error code describing the problem.
      */
-    void DeleteDirectories(const Path& path, std::error_code& ec) override;
+    void DeleteAll(const Path& path, std::error_code& ec) override;
 
     /**
      * @brief Opens the file at @p path and returns a handle to it.

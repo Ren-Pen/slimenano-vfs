@@ -347,13 +347,10 @@ TEST_F(ZipFileSystemTest, MutatingOperationsAreReadOnly) {
     m_fs->CreateDirectories(Path{"/x/y"}, ec);
     EXPECT_EQ(ec, std::errc::read_only_file_system);
 
-    m_fs->DeleteFile(Path{"/hello.txt"}, ec);
+    m_fs->Delete(Path{"/hello.txt"}, ec);
     EXPECT_EQ(ec, std::errc::read_only_file_system);
 
-    m_fs->DeleteDirectory(Path{"/dir"}, ec);
-    EXPECT_EQ(ec, std::errc::read_only_file_system);
-
-    m_fs->DeleteDirectories(Path{"/dir"}, ec);
+    m_fs->DeleteAll(Path{"/dir"}, ec);
     EXPECT_EQ(ec, std::errc::read_only_file_system);
 }
 

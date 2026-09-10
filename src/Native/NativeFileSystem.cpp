@@ -5,13 +5,14 @@
 
 #include <slimenano/vfs/NativeFileSystem.h>
 
-#include "NativeFileHandle.h"
-
 #include <filesystem>
 #include <chrono>
 #include <fstream>
 #include <string>
 #include <string_view>
+
+#include "NativeFileHandle.h"
+#include "NativeUtils.h"
 
 namespace slimenano::filesystem {
 
@@ -19,52 +20,6 @@ namespace {
 
 namespace fs = std::filesystem;
 namespace chrono = std::chrono;
-
-/**
- * @brief Converts a UTF-8 string view to a native filesystem path.
- *
- * The conversion goes through the C++20 char8_t path constructor so that
- * non-ASCII characters are preserved on Windows.
- *
- * @param utf8 The UTF-8 path to convert.
- *
- * @return The native path; empty when @p utf8 is empty.
- */
-fs::path FromUtf8(std::string_view utf8) {
-    if (utf8.empty()) {
-        return {};
-    }
-    return fs::path(std::u8string_view(reinterpret_cast<const char8_t*>(utf8.data()), utf8.size()));
-}
-
-/**
- * @brief Converts a native filesystem path to a UTF-8 string.
- *
- * @param native The native path to convert.
- *
- * @return The path as a UTF-8 string.
- */
-std::string ToUtf8(const fs::path& native) {
-    const auto utf8 = native.u8string();
-    return std::string(reinterpret_cast<const char*>(utf8.data()), utf8.size());
-}
-
-/**
- * @brief Maps a virtual path to a native path below a root directory.
- *
- * The virtual path is made absolute, and the leading root separator is
- * stripped before appending to the root.
- *
- * @param root Native root directory.
- * @param path Virtual path to map.
- *
- * @return The native path below @p root.
- */
-fs::path ToNativePath(const fs::path& root, const Path& path) {
-    const auto absolutePath = path.ToAbsolute("/");
-    const auto rel = absolutePath.String().substr(1);
-    return root / FromUtf8(rel);
-}
 
 } // namespace
 
@@ -81,7 +36,7 @@ struct NativeFileSystem::Impl {
  * @param root UTF-8 path of the backing directory on disk.
  */
 NativeFileSystem::NativeFileSystem(std::string_view root, std::error_code& ec) :
-    m_pImpl(std::make_unique<Impl>(FromUtf8(root))) {
+    m_pImpl(std::make_unique<Impl>(Utf8ToNativePath(root))) {
     ec.clear();
     auto is_dir = fs::is_directory(m_pImpl->m_root, ec);
     if (ec) {
@@ -283,7 +238,7 @@ std::vector<std::string> NativeFileSystem::List(const Path& path, std::error_cod
 
     std::vector<std::string> names;
     for (const auto& entry : iter) {
-        names.push_back(ToUtf8(entry.path().filename()));
+        names.push_back(NativePathToUtf8(entry.path().filename()));
     }
     return names;
 }
@@ -347,21 +302,7 @@ void NativeFileSystem::CreateDirectories(const Path& path, std::error_code& ec) 
  * @param path The virtual path of the file to delete.
  * @param ec   On failure, set to an error code describing the problem.
  */
-void NativeFileSystem::DeleteFile(const Path& path, std::error_code& ec) {
-    ec.clear();
-    fs::remove(ToNativePath(m_pImpl->m_root, path), ec);
-}
-
-/**
- * @brief Deletes the empty directory at @p path.
- *
- * Does nothing when the directory does not exist, and fails when it is not
- * empty.
- *
- * @param path The virtual path of the directory to delete.
- * @param ec   On failure, set to an error code describing the problem.
- */
-void NativeFileSystem::DeleteDirectory(const Path& path, std::error_code& ec) {
+void NativeFileSystem::Delete(const Path& path, std::error_code& ec) {
     ec.clear();
     fs::remove(ToNativePath(m_pImpl->m_root, path), ec);
 }
@@ -373,7 +314,7 @@ void NativeFileSystem::DeleteDirectory(const Path& path, std::error_code& ec) {
  * @param path The virtual path of the directory to delete.
  * @param ec   On failure, set to an error code describing the problem.
  */
-void NativeFileSystem::DeleteDirectories(const Path& path, std::error_code& ec) {
+void NativeFileSystem::DeleteAll(const Path& path, std::error_code& ec) {
     ec.clear();
     fs::remove_all(ToNativePath(m_pImpl->m_root, path), ec);
 }
@@ -390,7 +331,8 @@ void NativeFileSystem::DeleteDirectories(const Path& path, std::error_code& ec) 
  */
 std::unique_ptr<FileHandle> NativeFileSystem::Open(const Path& path, OpenOption openOptions, std::error_code& ec) {
     ec.clear();
-    auto handle = std::make_unique<NativeFileHandle>(ToUtf8(ToNativePath(m_pImpl->m_root, path)), openOptions, ec);
+    auto handle =
+        std::make_unique<NativeFileHandle>(NativePathToUtf8(ToNativePath(m_pImpl->m_root, path)), openOptions, ec);
     if (ec) {
         return {};
     }

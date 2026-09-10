@@ -137,9 +137,9 @@ void DoMount(fs::VirtualFileSystem& vfs, const std::string& arg) {
 
     std::error_code ec;
     if (type == "native") {
-        vfs.CreateAndMount<fs::NativeFileSystem>(fs::Path{mountPoint}, param, ec);
+        vfs.CreateAndMount<fs::NativeFileSystem>(ec, fs::Path{mountPoint}, param);
     } else if (type == "zip") {
-        vfs.CreateAndMount<fs::ZipFileSystem>(fs::Path{mountPoint}, param, ec);
+        vfs.CreateAndMount<fs::ZipFileSystem>(ec, fs::Path{mountPoint}, param);
     } else {
         std::cout << "Unknown FS type: " << type << std::endl;
         PrintMountUsage();

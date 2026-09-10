@@ -162,18 +162,7 @@ public:
      * @param path The virtual path of the file to delete.
      * @param ec   On failure, set to an error code describing the problem.
      */
-    virtual void DeleteFile(const Path& path, std::error_code& ec) = 0;
-
-    /**
-     * @brief Deletes the empty directory at @p path.
-     *
-     * Does nothing when the directory does not exist. Fails when the
-     * directory is not empty.
-     *
-     * @param path The virtual path of the directory to delete.
-     * @param ec   On failure, set to an error code describing the problem.
-     */
-    virtual void DeleteDirectory(const Path& path, std::error_code& ec) = 0;
+    virtual void Delete(const Path& path, std::error_code& ec) = 0;
 
     /**
      * @brief Recursively deletes the directory at @p path and everything it
@@ -184,7 +173,7 @@ public:
      * @param path The virtual path of the directory to delete.
      * @param ec   On failure, set to an error code describing the problem.
      */
-    virtual void DeleteDirectories(const Path& path, std::error_code& ec) = 0;
+    virtual void DeleteAll(const Path& path, std::error_code& ec) = 0;
 
     /**
      * @brief Opens the file at @p path and returns a handle to it.

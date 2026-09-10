@@ -21,13 +21,11 @@ NativeFileHandle::NativeFileHandle(std::string_view path, OpenOption options, st
         return;
     }
 
-    bool exists = false;
-    {
-        FilePtr existsFp(PortableFOpen(path, "rb"));
-        if (existsFp) {
-            exists = true;
-        }
+    bool exists = std::filesystem::exists(Utf8ToNativePath(path), ec);
+    if (ec) {
+        return;
     }
+
     if (!exists && !create) {
         ec = std::make_error_code(std::errc::no_such_file_or_directory);
         return;

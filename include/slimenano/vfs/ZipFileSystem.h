@@ -37,11 +37,9 @@ public:
 
     void CreateDirectories(const Path& path, std::error_code& ec) override;
 
-    void DeleteFile(const Path& path, std::error_code& ec) override;
+    void Delete(const Path& path, std::error_code& ec) override;
 
-    void DeleteDirectory(const Path& path, std::error_code& ec) override;
-
-    void DeleteDirectories(const Path& path, std::error_code& ec) override;
+    void DeleteAll(const Path& path, std::error_code& ec) override;
 
     [[nodiscard]] std::unique_ptr<FileHandle>
     Open(const Path& path, OpenOption openOptions, std::error_code& ec) override;

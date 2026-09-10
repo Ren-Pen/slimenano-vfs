@@ -155,31 +155,52 @@ struct VirtualFileSystem::Impl {
         auto absolutePath = path.ToAbsolute(Path::Root());
         auto [node, exact] = mountTree.ResolveNode(absolutePath);
 
+        bool noExist = true;
+        bool onlyHasFile = true;
+
         if (exact) {
+            noExist = false;
+            onlyHasFile = false;
             for (const auto& [name, child] : node->children) {
                 names.insert(name);
             }
         }
 
         while (node) {
+
             if (!node->data.fileSystems.empty()) {
                 auto rel = absolutePath.ToRelative(node->absolutePath);
                 for (auto it = node->data.fileSystems.rbegin(); it != node->data.fileSystems.rend(); ++it) {
                     std::error_code fsEc;
                     const auto& fs = *it;
-                    if (fs->IsDirectory(rel, fsEc)) {
-                        auto entries = fs->List(rel, fsEc);
-                        if (!fsEc) {
-                            for (auto& e : entries) {
-                                names.emplace(std::move(e));
+                    if (fs->Exists(rel, fsEc)) {
+                        noExist = false;
+                        if (fs->IsDirectory(rel, fsEc)) {
+                            onlyHasFile = false;
+                            auto entries = fs->List(rel, fsEc);
+                            if (!fsEc) {
+                                for (auto& e : entries) {
+                                    names.emplace(std::move(e));
+                                }
+                            } else if (!ec) {
+                                ec = fsEc;
                             }
-                        } else if (!ec) {
-                            ec = fsEc;
                         }
                     }
                 }
             }
+
             node = node->parent.lock();
+        }
+
+        if (noExist) {
+            ec = std::make_error_code(std::errc::no_such_file_or_directory);
+            return {};
+        }
+
+        if (onlyHasFile) {
+            ec = std::make_error_code(std::errc::not_a_directory);
+            return {};
         }
 
         return {names.begin(), names.end()};
@@ -492,21 +513,9 @@ void VirtualFileSystem::CreateDirectories(const Path& path, std::error_code& ec)
  * @param path The virtual path of the file to delete.
  * @param ec   On failure, set to an error code describing the problem.
  */
-void VirtualFileSystem::DeleteFile(const Path& path, std::error_code& ec) {
+void VirtualFileSystem::Delete(const Path& path, std::error_code& ec) {
     if (auto vfNode = m_impl->ResolveForWrite(path, ec)) {
-        vfNode->fs->DeleteFile(vfNode->path, ec);
-    }
-}
-
-/**
- * @brief Deletes the empty directory at @p path.
- *
- * @param path The virtual path of the directory to delete.
- * @param ec   On failure, set to an error code describing the problem.
- */
-void VirtualFileSystem::DeleteDirectory(const Path& path, std::error_code& ec) {
-    if (auto vfNode = m_impl->ResolveForWrite(path, ec)) {
-        vfNode->fs->DeleteDirectory(vfNode->path, ec);
+        vfNode->fs->Delete(vfNode->path, ec);
     }
 }
 
@@ -517,9 +526,9 @@ void VirtualFileSystem::DeleteDirectory(const Path& path, std::error_code& ec) {
  * @param path The virtual path of the directory to delete.
  * @param ec   On failure, set to an error code describing the problem.
  */
-void VirtualFileSystem::DeleteDirectories(const Path& path, std::error_code& ec) {
+void VirtualFileSystem::DeleteAll(const Path& path, std::error_code& ec) {
     if (auto vfNode = m_impl->ResolveForWrite(path, ec)) {
-        vfNode->fs->DeleteDirectories(vfNode->path, ec);
+        vfNode->fs->DeleteAll(vfNode->path, ec);
     }
 }
 

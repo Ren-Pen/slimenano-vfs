@@ -99,12 +99,12 @@ TEST_F(VirtualFileSystemOperationTest, DeleteFileAndDirectories) {
     m_vfs->CreateFile(Path{"/d/e/f.txt"}, ec);
     ASSERT_FALSE(ec) << ec.message();
 
-    m_vfs->DeleteFile(Path{"/d/e/f.txt"}, ec);
+    m_vfs->Delete(Path{"/d/e/f.txt"}, ec);
     ASSERT_FALSE(ec) << ec.message();
     EXPECT_FALSE(m_vfs->Exists(Path{"/d/e/f.txt"}, ec));
     ASSERT_FALSE(ec);
 
-    m_vfs->DeleteDirectories(Path{"/d"}, ec);
+    m_vfs->DeleteAll(Path{"/d"}, ec);
     ASSERT_FALSE(ec) << ec.message();
     EXPECT_FALSE(m_vfs->Exists(Path{"/d"}, ec));
     ASSERT_FALSE(ec);
