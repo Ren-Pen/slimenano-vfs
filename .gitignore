@@ -14,3 +14,5 @@ CMakeUserPresets.json
 **/*.log
 
 **/vcpkg_installed
+
+install/**

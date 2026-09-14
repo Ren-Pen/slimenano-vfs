@@ -1,16 +1,19 @@
 cmake_minimum_required(VERSION 3.21)
 project(SlimenanoVirtualFileSystem
-  VERSION 0.0.1
+  VERSION 1.0.0
   DESCRIPTION "This is a free virtual file system"
   HOMEPAGE_URL "https://github.com/Ren-Pen/slimenano-vfs"
   LANGUAGES CXX
 )
 
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
 set(NAMESPACE slimenano)
 set(TARGET_NAME vfs)
 set(TARGET ${NAMESPACE}_${TARGET_NAME})
 
-add_library(${TARGET}
+add_library(${TARGET} STATIC
   "src/pch.cpp"
   "src/Path.cpp"
   "src/Virtual/VirtualFileSystem.cpp"
@@ -25,21 +28,22 @@ add_library(${TARGET}
 add_library(${NAMESPACE}::${TARGET_NAME} ALIAS ${TARGET})
 
 target_include_directories(${TARGET}
-  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+  PUBLIC 
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/export>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
-
-target_compile_features(${TARGET} PUBLIC cxx_std_20)
 
 if(MSVC)
   # /utf-8: treat source files and narrow string literals as UTF-8 instead of
   # the ANSI code page, matching the VFS path encoding contract.
-  target_compile_options(${TARGET} PRIVATE /W4 /WX /utf-8)
+  target_compile_options(${TARGET} PRIVATE /W4 /WX /utf-8 /wd4251)
 else()
   target_compile_options(${TARGET} PRIVATE -Wall -Wextra -Wpedantic -Werror)
 endif()
 
-target_compile_features(${TARGET} PRIVATE cxx_std_20)
+target_compile_features(${TARGET} PUBLIC cxx_std_20)
 
 target_precompile_headers(${TARGET} PRIVATE "src/pch.h")
 
@@ -58,8 +62,59 @@ if(SLIMENANO_VFS_BUILD_TESTS)
   add_subdirectory(tests)
 endif()
 
-option(SLIMENANO_VFS_BUILD_DEMO "Build VFS demo" ON)
+option(SLIMENANO_VFS_BUILD_DEMO "Build VFS demo" OFF)
 
 if(SLIMENANO_VFS_BUILD_DEMO)
   add_subdirectory(demo)
 endif()
+
+# INSTALL CONFIG
+set_target_properties(${TARGET} PROPERTIES
+  EXPORT_NAME ${TARGET_NAME}
+  VERSION   ${PROJECT_VERSION}
+  SOVERSION ${PROJECT_VERSION_MAJOR}
+  WINDOWS_EXPORT_ALL_SYMBOLS ON  
+)
+
+set(INSTALL_TARGET ${TARGET}Targets)
+set(INSTALL_CONFIG ${TARGET}Config)
+set(SLIMENANO_VFS_INSTALL_CMAKE_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/${TARGET})
+
+install(TARGETS ${TARGET}
+  EXPORT ${INSTALL_TARGET}
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
+
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/export/slimenano/vfs/Export.h
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/slimenano/vfs
+)
+
+install(EXPORT ${INSTALL_TARGET}
+  FILE  ${INSTALL_TARGET}.cmake
+  NAMESPACE ${NAMESPACE}::
+  DESTINATION ${SLIMENANO_VFS_INSTALL_CMAKE_DIR}
+)
+
+configure_package_config_file(
+  ${CMAKE_CURRENT_SOURCE_DIR}/cmake/${INSTALL_CONFIG}.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/${INSTALL_CONFIG}.cmake
+  INSTALL_DESTINATION ${SLIMENANO_VFS_INSTALL_CMAKE_DIR}
+)
+
+write_basic_package_version_file(
+  ${CMAKE_CURRENT_BINARY_DIR}/${INSTALL_CONFIG}Version.cmake
+  VERSION ${PROJECT_VERSION}
+  COMPATIBILITY SameMajorVersion
+)
+
+install(FILES
+  ${CMAKE_CURRENT_BINARY_DIR}/${INSTALL_CONFIG}.cmake
+  ${CMAKE_CURRENT_BINARY_DIR}/${INSTALL_CONFIG}Version.cmake
+  DESTINATION ${SLIMENANO_VFS_INSTALL_CMAKE_DIR}
+)
