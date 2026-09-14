@@ -30,7 +30,6 @@ add_library(${NAMESPACE}::${TARGET_NAME} ALIAS ${TARGET})
 target_include_directories(${TARGET}
   PUBLIC 
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/export>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
@@ -38,7 +37,7 @@ target_include_directories(${TARGET}
 if(MSVC)
   # /utf-8: treat source files and narrow string literals as UTF-8 instead of
   # the ANSI code page, matching the VFS path encoding contract.
-  target_compile_options(${TARGET} PRIVATE /W4 /WX /utf-8 /wd4251)
+  target_compile_options(${TARGET} PRIVATE /W4 /WX /utf-8)
 else()
   target_compile_options(${TARGET} PRIVATE -Wall -Wextra -Wpedantic -Werror)
 endif()
@@ -72,8 +71,6 @@ endif()
 set_target_properties(${TARGET} PROPERTIES
   EXPORT_NAME ${TARGET_NAME}
   VERSION   ${PROJECT_VERSION}
-  SOVERSION ${PROJECT_VERSION_MAJOR}
-  WINDOWS_EXPORT_ALL_SYMBOLS ON  
 )
 
 set(INSTALL_TARGET ${TARGET}Targets)
@@ -89,10 +86,6 @@ install(TARGETS ${TARGET}
 
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-)
-
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/export/slimenano/vfs/Export.h
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/slimenano/vfs
 )
 
 install(EXPORT ${INSTALL_TARGET}
