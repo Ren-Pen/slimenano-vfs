@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 project(SlimenanoVirtualFileSystem
-  VERSION 1.0.0
+  VERSION 1.0.1
   DESCRIPTION "This is a free virtual file system"
   HOMEPAGE_URL "https://github.com/Ren-Pen/slimenano-vfs"
   LANGUAGES CXX
